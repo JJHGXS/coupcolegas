@@ -696,6 +696,10 @@
         // =========================================================
         // MULTIPLAYER ENGINE (FIREBASE + SUPABASE + PEERJS P2P)
         // =========================================================
+        const DEFAULT_SUPABASE_CONFIG = {
+            supabaseUrl: 'https://xliqrrxyvcehdxsygadw.supabase.co',
+            supabaseKey: 'sb_publishable_ACCeKcsQpcGJh49gzjrHpA_lIuBD2BJ'
+        };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'couplegas-static-v1';
         let db = null;
         let auth = null;
@@ -732,7 +736,7 @@
             try {
                 const rawConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
                     ? __firebase_config
-                    : savedCustomCfg;
+                    : (savedCustomCfg || DEFAULT_SUPABASE_CONFIG);
 
                 if (rawConfig) {
                     const parsedCfg = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
