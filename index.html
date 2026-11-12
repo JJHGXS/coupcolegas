@@ -222,6 +222,23 @@
                     <div class="text-right text-[11px] text-slate-400">
                         <div>Status da Rede: <span id="cloud-status-badge" class="text-amber-400 font-bold">Conectando...</span></div>
                         <div class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="online-uid-display">---</span></div>
+                        <button id="btn-toggle-firebase-setup" type="button" class="mt-1 text-[10px] text-indigo-400 hover:text-indigo-300 underline">
+                            <i class="fa-solid fa-database mr-1"></i> Configurar Nuvem Firebase (Opcional)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel Opcional de Configuração Firebase Próprio -->
+                <div id="firebase-custom-setup-box" class="hidden bg-slate-950/90 p-4 rounded-xl border border-indigo-500/40 space-y-2.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-indigo-300"><i class="fa-solid fa-cloud mr-1"></i> Conectar Projeto Firebase Gratuito</span>
+                        <button id="btn-close-firebase-setup" type="button" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Cole o JSON de configuração do seu Firebase Web App (com Firestore e Auth Anônima ativados). Ele ficará salvo no seu navegador.</p>
+                    <textarea id="firebase-custom-json-input" rows="3" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}' class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 font-mono text-[11px] text-slate-200 outline-none focus:border-indigo-400"></textarea>
+                    <div class="flex justify-end gap-2">
+                        <button id="btn-clear-firebase-custom" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold">Remover</button>
+                        <button id="btn-save-firebase-custom" type="button" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Salvar & Conectar Nuvem</button>
                     </div>
                 </div>
 
@@ -256,40 +273,6 @@
                     </div>
                     <div id="online-rooms-list" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
                         <div class="text-slate-500 italic py-2 text-center">Nenhuma sala local detectada. Crie uma acima ou insira o código do anfitrião!</div>
-                    </div>
-                </div>
-
-                <!-- Criar ou Entrar por Código -->
-                <div id="online-join-create-box" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-slate-950/60 p-4 rounded-xl border border-indigo-500/30 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h3 class="font-cinzel font-bold text-amber-400 text-sm mb-1"><i class="fa-solid fa-plus-circle mr-1"></i> Criar Nova Sala</h3>
-                            <p class="text-xs text-slate-400">Gere um código exclusivo de sala e configure as regras para seus amigos entrarem.</p>
-                        </div>
-                        <button id="btn-online-create-room" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
-                            Criar Sala na Nuvem
-                        </button>
-                    </div>
-
-                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h3 class="font-cinzel font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-right-to-bracket mr-1"></i> Entrar com Código</h3>
-                            <input type="text" id="online-room-code-input" maxlength="8" placeholder="Ex: A7K9P2" class="w-full mt-1 bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-lg px-3 py-2 text-sm uppercase font-mono tracking-widest text-white outline-none">
-                        </div>
-                        <button id="btn-online-join-room" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
-                            Conectar na Sala
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Lista de Salas Disponíveis na Nuvem -->
-                <div id="online-public-rooms-box" class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-300"><i class="fa-solid fa-satellite-dish text-emerald-400 mr-1.5"></i> Salas Abertas Disponíveis</span>
-                        <span class="text-[10px] text-slate-500">Atualização ao vivo</span>
-                    </div>
-                    <div id="online-rooms-list" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
-                        <div class="text-slate-500 italic py-2 text-center">Buscando salas abertas na nuvem...</div>
                     </div>
                 </div>
 
@@ -736,10 +719,20 @@
             document.getElementById('online-uid-display').innerText = currentUserUid;
             initLocalDiscoveryChannel();
 
+            const savedCustomCfg = localStorage.getItem('couplegas_firebase_config');
+            if (savedCustomCfg) {
+                const textarea = document.getElementById('firebase-custom-json-input');
+                if (textarea) textarea.value = savedCustomCfg;
+            }
+
             try {
-                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                    const firebaseConfig = JSON.parse(__firebase_config);
-                    const app = initializeApp(firebaseConfig);
+                const rawConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
+                    ? __firebase_config
+                    : savedCustomCfg;
+
+                if (rawConfig) {
+                    const firebaseConfig = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+                    const app = initializeApp(firebaseConfig, 'couplegas-cloud-' + Date.now());
                     db = getFirestore(app);
                     auth = getAuth(app);
 
@@ -757,7 +750,10 @@
                     return;
                 }
             } catch (err) {
-                console.warn('Fallback para Rede Global P2P ativado:', err);
+                console.warn('Erro ao conectar Firebase, usando Rede Global P2P:', err);
+                if (savedCustomCfg) {
+                    alertBox('Erro nas credenciais do Firebase salvas. Verifique se o Firestore e Login Anônimo estão ativos.');
+                }
             }
 
             // Modo Estático Universal: Rede Global P2P via WebRTC (PeerJS)
@@ -951,6 +947,83 @@
             }
         }
 
+        function syncOnlineHudAndLogs(logs) {
+            const n = gameState.players.length;
+            document.getElementById('hud-mode-badge').innerText =
+                `Online (${onlineRoomCode}) • ${n} Jogadores${matchConfig.teamsEnabled ? ' • Equipes' : ''}`;
+
+            document.getElementById('asylum-center-box').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-other').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-self').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-embezzle').classList.toggle('hidden', !matchConfig.teamsEnabled);
+
+            const hasAmb = matchConfig.specialRole === 'AMBASSADOR' || n === 10;
+            const hasInq = matchConfig.specialRole === 'INQUISITOR' || n === 10;
+            document.getElementById('btn-exchange').classList.toggle('hidden', !hasAmb);
+            document.getElementById('btn-inquisitor-self').classList.toggle('hidden', !hasInq);
+            document.getElementById('btn-inquisitor-inspect').classList.toggle('hidden', !hasInq);
+
+            if (Array.isArray(logs) && logs.length > 0) {
+                window._onlineLogsBuffer = [...logs];
+                const logContainer = document.getElementById('game-log');
+                logContainer.innerHTML = '';
+                logs.forEach(item => {
+                    const entry = document.createElement('div');
+                    entry.className = item.cls || 'text-slate-300';
+                    entry.innerHTML = `> ${item.msg}`;
+                    logContainer.appendChild(entry);
+                });
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function handleOnlinePostSyncUI() {
+            hideReactionControls();
+            document.getElementById('action-buttons').classList.remove('hidden');
+
+            const human = getHumanPlayer();
+            if (!human) return;
+
+            if (gameState.phase === 'GAME_OVER') {
+                checkTurnPhase();
+                return;
+            }
+
+            if (gameState.phase === 'ACTION_SELECTION') {
+                checkTurnPhase();
+            } else if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                const passed = gameState.pendingAction.passedUids || [];
+                if (!passed.includes(currentUserUid)) {
+                    promptReactionsForAction();
+                } else {
+                    const actor = gameState.players.find(p => p.id === gameState.pendingAction.sourceId);
+                    document.getElementById('status-message').innerText = `Você permitiu. Aguardando os demais jogadores reagirem a ${actor ? actor.name : ''}...`;
+                }
+            } else if (gameState.phase === 'BLOCK_REACTION_WINDOW' && gameState.pendingAction) {
+                const blocker = gameState.players.find(p => p.id === gameState.pendingAction.blockerId);
+                if (blocker && !isLocalController(blocker) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
+                    renderBlockReactionButtonsForLocal(blocker, gameState.pendingAction.blockRole);
+                } else {
+                    document.getElementById('status-message').innerText = `Aguardando resposta ao bloqueio de ${blocker ? blocker.name : ''}...`;
+                }
+            } else if (gameState.phase === 'LOSE_INFLUENCE_WINDOW') {
+                const targetPlayer = gameState.players.find(p => p.id === gameState.pendingLosePlayerId);
+                if (targetPlayer && isLocalController(targetPlayer)) {
+                    const afterStep = gameState.pendingAfterLose;
+                    gameState.pendingLosePlayerId = null;
+                    promptLoseInfluence(targetPlayer.id, () => {
+                        if (afterStep === 'RESOLVE_ACTION') {
+                            resolvePendingAction();
+                        } else {
+                            nextTurn();
+                        }
+                    });
+                } else if (targetPlayer) {
+                    document.getElementById('status-message').innerText = `Aguardando ${targetPlayer.name} escolher qual carta revelar...`;
+                }
+            }
+        }
+
         function broadcastP2PRoomState() {
             if (!isOnlineHost || !p2pRoomData) return;
             hostConnections = hostConnections.filter(c => c.open);
@@ -1004,9 +1077,27 @@
             }
 
             const peerId = `couplegas-room-${code}`;
-            peerInstance = new window.Peer(peerId);
+            let opened = false;
+            peerInstance = new window.Peer(peerId, {
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            const openTimeout = setTimeout(() => {
+                if (!opened) {
+                    updateCloudStatus('Servidor P2P lento — tente Firebase acima', 'text-rose-400');
+                    alertBox('O servidor P2P público demorou para responder. Você pode tentar novamente ou colar uma chave gratuita do Firebase em "Configurar Nuvem Firebase".');
+                }
+            }, 7000);
 
             peerInstance.on('open', () => {
+                opened = true;
+                clearTimeout(openTimeout);
                 onlineRoomCode = code;
                 isOnlineHost = true;
                 lastSyncedVersion = 0;
@@ -1066,8 +1157,10 @@
             });
 
             peerInstance.on('error', (err) => {
+                clearTimeout(openTimeout);
                 console.error('Erro P2P Host:', err);
-                alertBox('Erro ao abrir sala na rede P2P. Tente novamente.');
+                updateCloudStatus('Erro na Rede P2P', 'text-rose-400');
+                alertBox(`Erro P2P (${err.type || 'rede'}): Tente novamente ou use "Configurar Nuvem Firebase" acima.`);
             });
         }
 
@@ -1122,13 +1215,15 @@
                 alertBox('Biblioteca de rede P2P indisponível no momento.');
                 return;
             }
-
-            updateCloudStatus(`Conectando à sala ${code}...`, 'text-amber-400');
-            if (peerInstance) {
-                try { peerInstance.destroy(); } catch (e) {}
-            }
-
-            peerInstance = new window.Peer();
+            peerInstance = new window.Peer({
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
             peerInstance.on('open', () => {
                 const targetPeerId = `couplegas-room-${code}`;
                 const conn = peerInstance.connect(targetPeerId, { reliable: true });
@@ -1473,6 +1568,36 @@
         document.getElementById('btn-online-join-room').onclick = () => {
             const code = document.getElementById('online-room-code-input').value;
             joinOnlineRoom(code);
+        };
+        document.getElementById('btn-toggle-firebase-setup').onclick = () => {
+            document.getElementById('firebase-custom-setup-box').classList.toggle('hidden');
+        };
+        document.getElementById('btn-close-firebase-setup').onclick = () => {
+            document.getElementById('firebase-custom-setup-box').classList.add('hidden');
+        };
+        document.getElementById('btn-save-firebase-custom').onclick = async () => {
+            const raw = document.getElementById('firebase-custom-json-input').value.trim();
+            if (!raw) {
+                alertBox('Cole o JSON de configuração do Firebase primeiro.');
+                return;
+            }
+            try {
+                JSON.parse(raw);
+                localStorage.setItem('couplegas_firebase_config', raw);
+                document.getElementById('firebase-custom-setup-box').classList.add('hidden');
+                await initCloudServices();
+                alertBox('Configuração Firebase salva e conectada!');
+            } catch (e) {
+                alertBox('JSON inválido! Certifique-se de colar o objeto {...} válido.');
+            }
+        };
+        document.getElementById('btn-clear-firebase-custom').onclick = async () => {
+            localStorage.removeItem('couplegas_firebase_config');
+            document.getElementById('firebase-custom-json-input').value = '';
+            db = null;
+            auth = null;
+            await initCloudServices();
+            alertBox('Configuração Firebase removida. Voltando para Rede P2P.');
         };
         document.getElementById('btn-copy-room-code').onclick = () => {
             if (!onlineRoomCode) return;
