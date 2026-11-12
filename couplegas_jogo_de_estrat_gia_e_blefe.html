@@ -1,0 +1,3129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COUPLEGAS — Intriga, Diplomacia e Estratégia na Corte</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cinzel: ['Cinzel', 'serif'],
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at center, #1e1b4b 0%, #090d16 100%);
+            color: #f8fafc;
+            user-select: none;
+        }
+
+        .table-felt {
+            background: radial-gradient(ellipse at center, #14532d 0%, #052e16 75%, #022c22 100%);
+            box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.85), 0 20px 50px rgba(0, 0, 0, 0.9);
+            border: 10px solid #451a03;
+            outline: 3px solid #b45309;
+        }
+
+        .seat-card {
+            transform: translate(-50%, -50%);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gold-glow {
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.45);
+        }
+
+        .action-btn {
+            transition: all 0.18s ease;
+        }
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.12);
+        }
+        .action-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes floatUpFade {
+            0% { transform: translate(-50%, 0) scale(0.8); opacity: 0; }
+            20% { opacity: 1; transform: translate(-50%, -15px) scale(1.1); }
+            85% { opacity: 1; transform: translate(-50%, -45px) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -65px) scale(0.95); }
+        }
+        .event-banner-anim {
+            animation: floatUpFade 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes fallSpin {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0.85; }
+        }
+        .falling-particle {
+            position: fixed;
+            top: -50px;
+            pointer-events: none;
+            z-index: 90;
+            animation: fallSpin linear forwards;
+        }
+
+        @keyframes coinSpin3D {
+            0% { transform: translateY(-10vh) rotateY(0deg) rotateZ(0deg); opacity: 1; }
+            50% { transform: translateY(50vh) rotateY(540deg) rotateZ(180deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotateY(1080deg) rotateZ(360deg); opacity: 0.9; }
+        }
+        .coin-3d-particle {
+            position: fixed;
+            top: -50px;
+            pointer-events: none;
+            z-index: 90;
+            animation: coinSpin3D linear forwards;
+        }
+
+        @keyframes danceBounce {
+            0%, 100% { transform: translateY(0) rotate(-6deg) scale(1); }
+            25% { transform: translateY(-18px) rotate(6deg) scale(1.06); }
+            50% { transform: translateY(0) rotate(-4deg) scale(1); }
+            75% { transform: translateY(-14px) rotate(8deg) scale(1.05); }
+        }
+        .dancer-anim {
+            animation: danceBounce 0.95s ease-in-out infinite;
+        }
+
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-6px, 4px); }
+            40% { transform: translate(6px, -4px); }
+            60% { transform: translate(-4px, -2px); }
+            80% { transform: translate(4px, 3px); }
+        }
+        .shake-effect {
+            animation: screenShake 0.45s ease-in-out;
+        }
+
+        @keyframes victoryCardPop {
+            0% { transform: scale(0.45) translateY(40px); opacity: 0; }
+            65% { transform: scale(1.04) translateY(-6px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .victory-modal-enter {
+            animation: victoryCardPop 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes spotlightSweep {
+            0%, 100% { transform: rotate(-18deg) scaleY(1.1); opacity: 0.35; }
+            50% { transform: rotate(18deg) scaleY(1.2); opacity: 0.65; }
+        }
+        .victory-spotlight {
+            position: absolute;
+            top: -15%;
+            width: 140px;
+            height: 130vh;
+            background: linear-gradient(180deg, rgba(251, 191, 36, 0.42) 0%, rgba(251, 191, 36, 0) 85%);
+            transform-origin: top center;
+            pointer-events: none;
+            filter: blur(8px);
+            animation: spotlightSweep 3.2s ease-in-out infinite;
+        }
+
+        @keyframes crownPulseFloat {
+            0%, 100% { transform: translateY(0) scale(1) rotate(-3deg); filter: drop-shadow(0 0 14px rgba(251,191,36,0.75)); }
+            50% { transform: translateY(-10px) scale(1.1) rotate(3deg); filter: drop-shadow(0 0 26px rgba(251,191,36,1)); }
+        }
+        .crown-hero {
+            animation: crownPulseFloat 1.8s ease-in-out infinite;
+        }
+
+        @keyframes discoLights {
+            0%, 100% { background-color: rgba(236, 72, 153, 0.14); border-color: rgba(236, 72, 153, 0.5); }
+            33% { background-color: rgba(168, 85, 247, 0.16); border-color: rgba(168, 85, 247, 0.5); }
+            66% { background-color: rgba(56, 189, 248, 0.16); border-color: rgba(56, 189, 248, 0.5); }
+        }
+        .party-stage-box {
+            animation: discoLights 1.8s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans overflow-x-hidden">
+
+    <!-- ========================================================= -->
+    <!-- TELA 1: LOBBY & CONFIGURAÇÕES DA PARTIDA                  -->
+    <!-- ========================================================= -->
+    <div id="lobby-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-slate-900/95 border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden">
+            
+            <!-- Cabeçalho do Lobby -->
+            <div class="bg-gradient-to-r from-slate-950 via-amber-950/40 to-slate-950 p-6 md:p-8 text-center border-b border-amber-500/20">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 text-2xl mb-3 shadow-lg">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <h1 class="font-cinzel text-3xl md:text-4xl font-black tracking-wider text-amber-400">COUPLEGAS</h1>
+                <p class="text-slate-300 text-xs md:text-sm mt-2 max-w-xl mx-auto leading-relaxed">
+                    Um jogo de intriga política, dedução e blefe estratégico. Manipule influências na corte, conteste declarações suspeitas e elimine seus rivais até restar apenas um soberano na mesa.
+                </p>
+            </div>
+
+            <!-- Passo 1: Seleção de Modo -->
+            <div id="lobby-step-mode" class="p-6 md:p-8 space-y-6">
+                <h2 class="text-center font-cinzel text-lg font-bold text-slate-200">Selecione o Modo de Jogo</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button id="btn-select-solo" class="group bg-slate-800/90 hover:bg-amber-950/50 border-2 border-amber-500/40 hover:border-amber-400 rounded-2xl p-6 text-left transition shadow-xl">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-user-secret"></i>
+                        </div>
+                        <h3 class="font-cinzel text-lg font-bold text-amber-300 mb-1">Criar Partida Solo</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">Enfrente oponentes controlados por Inteligência Artificial com regras personalizadas (2 a 10 jogadores).</p>
+                    </button>
+
+                    <button id="btn-select-online" class="group bg-slate-800/90 hover:bg-indigo-950/70 border-2 border-indigo-500/40 hover:border-indigo-400 rounded-2xl p-6 text-left transition shadow-xl relative overflow-hidden">
+                        <span class="absolute top-3 right-3 text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">Nuvem Ativa</span>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <h3 class="font-cinzel text-lg font-bold text-indigo-300 mb-1">Criar / Entrar Online</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">Jogue com amigos em qualquer lugar via salas sincronizadas na nuvem sem precisar de servidor próprio.</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Passo 1B: Lobby Multiplayer Online -->
+            <div id="lobby-step-online" class="hidden p-6 md:p-8 space-y-5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="font-cinzel text-lg md:text-xl font-bold text-indigo-400"><i class="fa-solid fa-globe mr-2"></i> Salas Multiplayer Online</h2>
+                    <button id="btn-back-mode-from-online" class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-left"></i> Voltar
+                    </button>
+                </div>
+
+                <!-- Identificação do Jogador -->
+                <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                    <div class="w-full sm:w-auto flex-1">
+                        <label class="text-[11px] font-bold uppercase text-slate-400 block mb-1">Seu Apelido na Corte</label>
+                        <input type="text" id="online-player-name" maxlength="16" placeholder="Ex: Lorde Arthur" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                    </div>
+                    <div class="text-right text-[11px] text-slate-400">
+                        <div>Status da Nuvem: <span id="cloud-status-badge" class="text-amber-400 font-bold">Conectando...</span></div>
+                        <div class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="online-uid-display">---</span></div>
+                    </div>
+                </div>
+
+                <!-- Criar ou Entrar por Código -->
+                <div id="online-join-create-box" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-indigo-500/30 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-cinzel font-bold text-amber-400 text-sm mb-1"><i class="fa-solid fa-plus-circle mr-1"></i> Criar Nova Sala</h3>
+                            <p class="text-xs text-slate-400">Gere um código exclusivo de sala e configure as regras para seus amigos entrarem.</p>
+                        </div>
+                        <button id="btn-online-create-room" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
+                            Criar Sala na Nuvem
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-cinzel font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-right-to-bracket mr-1"></i> Entrar com Código</h3>
+                            <input type="text" id="online-room-code-input" maxlength="8" placeholder="Ex: A7K9P2" class="w-full mt-1 bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-lg px-3 py-2 text-sm uppercase font-mono tracking-widest text-white outline-none">
+                        </div>
+                        <button id="btn-online-join-room" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
+                            Conectar na Sala
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de Salas Disponíveis na Nuvem -->
+                <div id="online-public-rooms-box" class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300"><i class="fa-solid fa-satellite-dish text-emerald-400 mr-1.5"></i> Salas Abertas Disponíveis</span>
+                        <span class="text-[10px] text-slate-500">Atualização ao vivo</span>
+                    </div>
+                    <div id="online-rooms-list" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
+                        <div class="text-slate-500 italic py-2 text-center">Buscando salas abertas na nuvem...</div>
+                    </div>
+                </div>
+
+                <!-- Sala de Espera Conectada (Waiting Room) -->
+                <div id="online-waiting-room" class="hidden bg-slate-950/80 p-5 rounded-xl border-2 border-amber-500/40 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                            <span class="text-[10px] uppercase tracking-wider text-slate-400 block">Código da Sala</span>
+                            <div class="flex items-center gap-2">
+                                <span id="waiting-room-code" class="font-mono text-2xl font-black text-amber-400 tracking-widest">------</span>
+                                <button id="btn-copy-room-code" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded border border-slate-600" title="Copiar Código">
+                                    <i class="fa-solid fa-copy mr-1"></i> Copiar
+                                </button>
+                            </div>
+                        </div>
+                        <button id="btn-leave-online-room" class="text-xs bg-rose-950/70 hover:bg-rose-900 text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/40">
+                            <i class="fa-solid fa-door-open mr-1"></i> Sair da Sala
+                        </button>
+                    </div>
+
+                    <div>
+                        <div class="text-xs font-bold text-slate-300 mb-2">Jogadores na Sala (<span id="waiting-players-count">1</span>/10):</div>
+                        <div id="waiting-players-list" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+                    </div>
+
+                    <div id="waiting-host-controls" class="hidden pt-2 flex flex-wrap justify-between items-center gap-3 border-t border-slate-800">
+                        <button id="btn-online-configure-rules" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold px-4 py-2.5 rounded-xl border border-amber-500/30">
+                            <i class="fa-solid fa-sliders mr-1"></i> Configurar Regras da Sala
+                        </button>
+                        <button id="btn-online-start-match" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg">
+                            <i class="fa-solid fa-play mr-1.5"></i> Iniciar Partida Online
+                        </button>
+                    </div>
+                    <div id="waiting-guest-notice" class="hidden text-center text-xs text-indigo-300 py-2 bg-indigo-950/40 rounded-lg border border-indigo-500/30">
+                        <i class="fa-solid fa-hourglass-half mr-1 animate-pulse"></i> Aguardando o anfitrião iniciar a partida...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passo 2: Configurações Detalhadas da Partida -->
+            <div id="lobby-step-config" class="hidden p-6 md:p-8 space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="font-cinzel text-lg md:text-xl font-bold text-amber-400"><i class="fa-solid fa-sliders mr-2"></i> Configurações da Partida</h2>
+                    <button id="btn-back-mode" class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-left"></i> Voltar
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+                    
+                    <!-- 1. Quantidade de Jogadores (2 a 10) -->
+                    <div id="cfg-players-wrapper" class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label class="font-bold text-slate-200"><i class="fa-solid fa-users text-amber-400 mr-1.5"></i> Jogadores na Mesa</label>
+                            <span id="cfg-players-val" class="text-lg font-black text-amber-400">4</span>
+                        </div>
+                        <input type="range" id="cfg-players" min="2" max="10" value="4" class="w-full accent-amber-500 cursor-pointer">
+                        <div id="cfg-deck-scale-info" class="text-[11px] text-emerald-400 font-medium">
+                            Baralho: 3 cópias de cada personagem (15 cartas)
+                        </div>
+                    </div>
+
+                    <!-- 2. Carta Especial (Embaixador vs Inquisidor) -->
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <label class="font-bold text-slate-200 block"><i class="fa-solid fa-id-card text-purple-400 mr-1.5"></i> Carta da Corte</label>
+                        <div class="grid grid-cols-2 gap-2" id="cfg-role-group">
+                            <button type="button" data-role="AMBASSADOR" class="cfg-role-btn py-2 px-3 rounded-lg border-2 border-emerald-500 bg-emerald-950/50 text-emerald-300 font-bold text-xs transition">
+                                <i class="fa-solid fa-arrows-rotate mr-1"></i> Embaixador
+                            </button>
+                            <button type="button" data-role="INQUISITOR" class="cfg-role-btn py-2 px-3 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition">
+                                <i class="fa-solid fa-magnifying-glass mr-1"></i> Inquisidor
+                            </button>
+                        </div>
+                        <div id="cfg-role-note" class="text-[11px] text-slate-400">
+                            Apenas um deles entra no baralho (exceto mesas de 10 jogadores).
+                        </div>
+                    </div>
+
+                    <!-- 3. Modo de Equipes (Católicos vs Protestantes + Asilo) -->
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="font-bold text-slate-200"><i class="fa-solid fa-scale-balanced text-sky-400 mr-1.5"></i> Modo Equipes & Asilo</label>
+                            <input type="checkbox" id="cfg-teams" class="w-4 h-4 accent-amber-500 cursor-pointer">
+                        </div>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            Divide a mesa entre <span class="text-sky-400 font-semibold">Católicos</span> e <span class="text-rose-400 font-semibold">Protestantes</span>. Ativa o <strong>Asilo</strong> para conversões e desfalques!
+                        </p>
+                    </div>
+
+                    <!-- 4. Temporizador de Jogada -->
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="font-bold text-slate-200"><i class="fa-solid fa-hourglass-half text-rose-400 mr-1.5"></i> Tempo por Jogada</label>
+                            <input type="checkbox" id="cfg-timer-enabled" class="w-4 h-4 accent-amber-500 cursor-pointer">
+                        </div>
+                        <div id="cfg-timer-box" class="opacity-40 pointer-events-none transition space-y-1">
+                            <div class="flex justify-between text-xs">
+                                <span class="text-slate-400">Limite (20s a 60s):</span>
+                                <span id="cfg-timer-val" class="font-bold text-amber-400">30s</span>
+                            </div>
+                            <input type="range" id="cfg-timer-seconds" min="20" max="60" step="5" value="30" class="w-full accent-rose-500 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- 5. Alcance de Proteção (Capitão e Condessa) -->
+                    <div class="md:col-span-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <label class="font-bold text-slate-200 block"><i class="fa-solid fa-shield-halved text-amber-400 mr-1.5"></i> Proteção de Capitão e Condessa</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button type="button" data-prot="SELF_ONLY" class="cfg-prot-btn p-3 rounded-lg border-2 border-amber-500 bg-amber-950/30 text-left transition">
+                                <div class="text-xs font-bold text-amber-300">Apenas Próprio Jogador (Clássico)</div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">Capitão e Condessa só bloqueiam ataques direcionados a você mesmo.</div>
+                            </button>
+                            <button type="button" data-prot="ANY_ALLY" class="cfg-prot-btn p-3 rounded-lg border border-slate-700 bg-slate-900 text-left transition">
+                                <div class="text-xs font-bold text-slate-300">Salvar Outros Jogadores / Aliados</div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">Permite bloquear roubos/assassinatos contra qualquer alvo (ou aliado no Modo Equipes).</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 6. Nível de Dificuldade da IA (Modo Solo) -->
+                    <div id="cfg-difficulty-wrapper" class="md:col-span-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="font-bold text-slate-200"><i class="fa-solid fa-brain text-rose-400 mr-1.5"></i> Dificuldade da Inteligência Artificial (Solo)</label>
+                            <span id="cfg-diff-desc" class="text-[11px] text-amber-400 font-semibold">Normal: Blefes e contestações moderadas</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <button type="button" data-diff="EASY" class="cfg-diff-btn py-2 px-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition">
+                                Fácil
+                            </button>
+                            <button type="button" data-diff="NORMAL" class="cfg-diff-btn py-2 px-2 rounded-lg border-2 border-amber-500 bg-amber-950/40 text-amber-300 font-bold text-xs transition">
+                                Normal
+                            </button>
+                            <button type="button" data-diff="HARD" class="cfg-diff-btn py-2 px-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition">
+                                Difícil
+                            </button>
+                            <button type="button" data-diff="NIGHTMARE" class="cfg-diff-btn py-2 px-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition">
+                                Pesadelo
+                            </button>
+                            <button type="button" data-diff="INFERNAL" class="cfg-diff-btn col-span-2 sm:col-span-1 py-2 px-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition">
+                                Infernal
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="pt-2 flex justify-end gap-3">
+                    <button id="btn-launch-game" class="w-full md:w-auto bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black px-8 py-3.5 rounded-xl shadow-xl text-sm uppercase tracking-wider transition transform hover:-translate-y-0.5">
+                        <i class="fa-solid fa-play mr-2"></i> Iniciar Partida na Mesa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TELA 2: MESA DE JOGO CIRCULAR                             -->
+    <!-- ========================================================= -->
+    <div id="game-screen" class="hidden min-h-screen flex flex-col">
+        <!-- Barra Superior -->
+        <header class="bg-slate-950/90 border-b border-amber-500/20 px-4 py-2.5 flex flex-wrap justify-between items-center gap-2 z-30">
+            <div class="flex items-center gap-3">
+                <span class="font-cinzel text-lg font-black text-amber-400 tracking-wider"><i class="fa-solid fa-crown mr-1.5"></i>COUPLEGAS</span>
+                <span id="hud-mode-badge" class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700"></span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Timer Display -->
+                <div id="hud-timer-badge" class="hidden bg-rose-950/80 border border-rose-500/50 text-rose-300 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-stopwatch"></i>
+                    <span id="hud-timer-seconds">30s</span>
+                </div>
+
+                <button id="btn-open-rules" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-600 transition">
+                    <i class="fa-solid fa-book-open mr-1 text-amber-400"></i> Regras
+                </button>
+                <button id="btn-restart-match" class="text-xs bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 px-3 py-1.5 rounded-lg border border-amber-500/40 transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Reiniciar
+                </button>
+                <button id="btn-back-lobby" class="text-xs bg-slate-800 hover:bg-rose-950/70 text-slate-300 hover:text-rose-200 px-3 py-1.5 rounded-lg border border-slate-600 hover:border-rose-500/50 transition">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Voltar ao Lobby
+                </button>
+            </div>
+        </header>
+
+        <!-- Área Principal -->
+        <main class="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 max-w-7xl w-full mx-auto">
+            
+            <!-- Coluna Esquerda / Centro: Mesa Circular -->
+            <div class="flex-1 flex flex-col items-center justify-center relative min-h-[460px] sm:min-h-[540px]">
+                
+                <!-- Container da Mesa Circular -->
+                <div id="circular-table-wrapper" class="relative w-full max-w-[660px] aspect-[1.28/1] flex items-center justify-center my-4">
+                    
+                    <!-- Feltro Oval da Mesa -->
+                    <div class="table-felt w-[74%] h-[68%] rounded-full flex flex-col items-center justify-center p-4 text-center relative z-10">
+                        <div class="text-[10px] uppercase tracking-widest text-emerald-300/70 font-bold mb-1">Corte Real</div>
+                        
+                        <div class="flex items-center justify-center gap-4 sm:gap-6 my-1">
+                            <!-- Tesouro Central -->
+                            <div class="bg-slate-950/75 border border-amber-500/40 px-3 py-1.5 rounded-xl">
+                                <div class="text-[10px] text-slate-400 uppercase">Tesouro</div>
+                                <div class="text-sm sm:text-base font-black text-amber-400"><i class="fa-solid fa-coins mr-1"></i><span id="bank-coins">50</span></div>
+                            </div>
+
+                            <!-- Baralho -->
+                            <div class="bg-slate-950/75 border border-slate-600/60 px-3 py-1.5 rounded-xl">
+                                <div class="text-[10px] text-slate-400 uppercase">Baralho</div>
+                                <div class="text-sm sm:text-base font-black text-slate-200"><i class="fa-solid fa-layer-group mr-1 text-purple-400"></i><span id="deck-count">15</span></div>
+                            </div>
+
+                            <!-- Asilo (Modo Equipes) -->
+                            <div id="asylum-center-box" class="hidden bg-slate-950/80 border border-cyan-500/50 px-3 py-1.5 rounded-xl">
+                                <div class="text-[10px] text-cyan-300 uppercase font-bold">Asilo</div>
+                                <div class="text-sm sm:text-base font-black text-cyan-400"><i class="fa-solid fa-church mr-1"></i><span id="asylum-coins">0</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Indicador de Turno & Status -->
+                        <div class="mt-2 max-w-[88%]">
+                            <div id="turn-indicator" class="font-cinzel text-xs sm:text-sm font-bold text-amber-300">Aguardando início...</div>
+                            <div id="status-message" class="text-[11px] text-slate-200 mt-0.5 line-clamp-2">Prepare sua estratégia.</div>
+                        </div>
+                    </div>
+
+                    <!-- Camada de Assentos ao Redor da Mesa -->
+                    <div id="circular-seats-layer" class="absolute inset-0 pointer-events-none z-20"></div>
+
+                    <!-- Camada de Efeitos Visuais na Mesa (Roubo / Morte) -->
+                    <div id="table-fx-layer" class="absolute inset-0 pointer-events-none z-30 overflow-visible"></div>
+                </div>
+
+                <!-- Painel Inferior: Sua Mão & Ações -->
+                <div class="w-full max-w-3xl bg-slate-900/95 border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl z-20">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                        
+                        <!-- Suas Cartas e Moedas -->
+                        <div class="flex items-center gap-3">
+                            <div id="human-cards-container" class="flex gap-2"></div>
+                            <div class="space-y-1">
+                                <div class="text-xs font-bold text-slate-200" id="human-name-label">Você</div>
+                                <div class="text-base font-black text-amber-400"><i class="fa-solid fa-coins mr-1"></i><span id="human-coins">2</span> moedas</div>
+                                <span id="human-team-badge" class="hidden inline-block"></span>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação / Reação -->
+                        <div class="flex-1 w-full">
+                            <!-- Controles de Reação (Contestar / Bloquear) -->
+                            <div id="reaction-controls" class="hidden flex flex-wrap justify-center md:justify-end gap-2"></div>
+
+                            <!-- Botões de Ação do Turno -->
+                            <div id="action-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                <button id="btn-income" class="action-btn bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600">
+                                    Renda (+1)
+                                </button>
+                                <button id="btn-foreign-aid" class="action-btn bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-slate-600">
+                                    Ajuda Externa (+2)
+                                </button>
+                                <button id="btn-coup" class="action-btn bg-red-950/80 hover:bg-red-900 text-red-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-red-600/50">
+                                    Golpe de Estado (-7)
+                                </button>
+
+                                <button id="btn-tax" class="action-btn bg-amber-950/60 hover:bg-amber-900/70 text-amber-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-amber-500/40">
+                                    Duque: Taxar (+3)
+                                </button>
+                                <button id="btn-assassinate" class="action-btn bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-rose-500/40">
+                                    Assassino (-3)
+                                </button>
+                                <button id="btn-steal" class="action-btn bg-sky-950/60 hover:bg-sky-900/70 text-sky-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-sky-500/40">
+                                    Capitão: Extorquir
+                                </button>
+
+                                <button id="btn-exchange" class="action-btn bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-emerald-500/40">
+                                    Embaixador: Trocar
+                                </button>
+                                <button id="btn-inquisitor-self" class="hidden action-btn bg-violet-950/60 hover:bg-violet-900/70 text-violet-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-violet-500/40">
+                                    Inquisidor: Trocar 1
+                                </button>
+                                <button id="btn-inquisitor-inspect" class="hidden action-btn bg-violet-950/60 hover:bg-violet-900/70 text-violet-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-violet-500/40">
+                                    Inquisidor: Investigar
+                                </button>
+
+                                <!-- Ações de Equipe / Asilo -->
+                                <button id="btn-convert-other" class="hidden action-btn bg-cyan-950/60 hover:bg-cyan-900/70 text-cyan-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-cyan-500/40">
+                                    Converter Outro (-1)
+                                </button>
+                                <button id="btn-convert-self" class="hidden action-btn bg-cyan-950/60 hover:bg-cyan-900/70 text-cyan-300 text-xs font-bold py-2 px-2.5 rounded-lg border border-cyan-500/40">
+                                    Auto-Converter (-2)
+                                </button>
+                                <button id="btn-embezzle" class="hidden action-btn bg-amber-900/50 hover:bg-amber-800/70 text-amber-200 text-xs font-bold py-2 px-2.5 rounded-lg border border-amber-400/50">
+                                    Roubar Asilo (Não-Duque)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna Direita: Histórico da Corte -->
+            <aside class="w-full lg:w-72 bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 flex flex-col max-h-[260px] lg:max-h-[calc(100vh-84px)]">
+                <div class="text-xs font-cinzel font-bold text-amber-400 border-b border-slate-800 pb-2 mb-2 flex items-center justify-between">
+                    <span><i class="fa-solid fa-scroll mr-1.5"></i> Registro da Corte</span>
+                </div>
+                <div id="game-log" class="flex-1 overflow-y-auto space-y-1.5 text-xs font-mono pr-1"></div>
+            </aside>
+
+        </main>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAIS DO JOGO                                            -->
+    <!-- ========================================================= -->
+
+    <!-- Modal: Escolher Alvo -->
+    <div id="modal-target" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+            <h3 id="modal-title" class="font-cinzel text-lg font-bold text-amber-400">Escolher Alvo</h3>
+            <p id="modal-desc" class="text-xs text-slate-300">Selecione um jogador:</p>
+            <div id="modal-options" class="space-y-2 max-h-64 overflow-y-auto"></div>
+            <button id="modal-cancel" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-xl border border-slate-600">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modal: Troca de Cartas (Embaixador / Inquisidor) -->
+    <div id="modal-exchange" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <h3 id="exchange-modal-title" class="font-cinzel text-lg font-bold text-emerald-400">Troca de Influências</h3>
+            <p class="text-xs text-slate-300">Selecione <strong id="exchange-max-count" class="text-amber-400">2</strong> carta(s) para manter na sua mão (<span id="exchange-selected-count">0</span> selecionada(s)):</p>
+            <div id="exchange-cards-container" class="flex flex-wrap justify-center gap-3 py-2"></div>
+            <button id="btn-confirm-exchange" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider">Confirmar Escolha</button>
+        </div>
+    </div>
+
+    <!-- Modal: Investigação do Inquisidor -->
+    <div id="modal-inspect" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-violet-500/40 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <h3 class="font-cinzel text-lg font-bold text-violet-400"><i class="fa-solid fa-magnifying-glass mr-1.5"></i>Inquisição Secreta</h3>
+            <p id="inspect-desc" class="text-xs text-slate-300">Escolha uma carta:</p>
+            <div id="inspect-card-display" class="flex justify-center gap-3 py-2"></div>
+            <p id="inspect-subhint" class="text-[11px] text-slate-400"></p>
+            <div id="inspect-decision-buttons" class="hidden grid grid-cols-2 gap-2 pt-2">
+                <button id="btn-inspect-keep" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl text-xs border border-slate-600">Devolver Carta</button>
+                <button id="btn-inspect-swap" class="bg-violet-700 hover:bg-violet-600 text-white font-bold py-2.5 rounded-xl text-xs border border-violet-400">Forçar Troca</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Perder Influência -->
+    <div id="modal-lose-influence" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-rose-600 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <h3 class="font-cinzel text-lg font-bold text-rose-400"><i class="fa-solid fa-skull mr-1.5"></i>Você Perdeu uma Influência!</h3>
+            <p class="text-xs text-slate-300">Escolha qual carta você irá revelar e descartar:</p>
+            <div id="lose-cards-container" class="flex justify-center gap-3 py-2"></div>
+        </div>
+    </div>
+
+    <!-- Modal: Regras Rápidas -->
+    <div id="modal-rules" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="font-cinzel text-lg font-bold text-amber-400">Guia Rápido — COUPLEGAS</h3>
+                <button id="btn-close-rules" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+                <p><strong class="text-amber-300">Duque:</strong> Pega 3 moedas (Taxas). Bloqueia Ajuda Externa e Roubo do Asilo.</p>
+                <p><strong class="text-rose-300">Assassino:</strong> Paga 3 moedas para eliminar uma influência do alvo.</p>
+                <p><strong class="text-purple-300">Condessa:</strong> Bloqueia tentativas de assassinato.</p>
+                <p><strong class="text-sky-300">Capitão:</strong> Rouba até 2 moedas de um oponente. Bloqueia roubo de outro Capitão.</p>
+                <p><strong class="text-emerald-300">Embaixador:</strong> Compra 2 cartas do baralho e devolve 2. Bloqueia Capitão.</p>
+                <p><strong class="text-violet-300">Inquisidor:</strong> Troca 1 carta do baralho OU olha 1 carta oculta de um oponente e decide se ele mantém ou troca.</p>
+                <p><strong class="text-cyan-300">Modo Equipes & Asilo:</strong> Aliados não se atacam, roubam, bloqueiam ou contestam enquanto houver adversários da outra equipe. Use o Asilo para converter jogadores (1 moeda) ou a si mesmo (2 moedas), ou roube o Asilo declarando não possuir o Duque.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay: Animação Cinematográfica de Vitória -->
+    <div id="victory-overlay" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-hidden">
+        <canvas id="victory-fireworks-canvas" class="fixed inset-0 pointer-events-none z-10"></canvas>
+        <div id="victory-spotlights-layer" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+        <div id="victory-particles-layer" class="fixed inset-0 pointer-events-none z-20 overflow-hidden"></div>
+
+        <div id="victory-card-box" class="relative z-30 bg-slate-900/95 border-2 border-amber-400 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-[0_0_60px_rgba(245,158,11,0.45)]">
+            <span id="victory-theme-badge" class="inline-block text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                Vitória Real
+            </span>
+
+            <div id="victory-visual-stage" class="min-h-[135px] flex flex-col items-center justify-center rounded-2xl p-3"></div>
+
+            <div>
+                <h2 id="victory-title" class="font-cinzel text-2xl font-black text-amber-400">VITÓRIA!</h2>
+                <p id="victory-subtitle" class="text-xs text-slate-300 mt-1"></p>
+            </div>
+
+            <div id="victory-taunt-box" class="hidden bg-rose-950/80 border border-rose-500 text-rose-200 font-black text-sm py-2.5 px-4 rounded-xl tracking-wide shadow-lg"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                <button id="btn-victory-rematch" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider shadow-lg">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Revanche
+                </button>
+                <button id="btn-victory-cycle-anim" class="bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 font-bold py-2.5 px-3 rounded-xl text-xs border border-indigo-500/40">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Trocar Efeito
+                </button>
+                <button id="btn-victory-close" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs border border-slate-600">
+                    Ver Mesa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- JAVASCRIPT: LÓGICA COMPLETA DO JOGO & NUVEM MULTIPLAYER   -->
+    <!-- ========================================================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =========================================================
+        // CLOUD MULTIPLAYER SETUP (STATIC HOSTING READY)
+        // =========================================================
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'couplegas-static-v1';
+        let db = null;
+        let auth = null;
+        let currentUserUid = null;
+        let onlineRoomCode = null;
+        let isOnlineHost = false;
+        let roomUnsubscribe = null;
+        let publicRoomsUnsubscribe = null;
+        let isApplyingRemoteState = false;
+        let lastSyncedVersion = -1;
+
+        async function initCloudServices() {
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    updateCloudStatus('Modo Local / Offline', 'text-amber-400');
+                    return;
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                currentUserUid = auth.currentUser?.uid || ('user_' + Math.random().toString(36).substring(2, 10));
+                document.getElementById('online-uid-display').innerText = currentUserUid;
+                updateCloudStatus('Conectado na Nuvem', 'text-emerald-400');
+                listenToPublicRooms();
+            } catch (err) {
+                console.error('Erro ao conectar serviço em nuvem:', err);
+                updateCloudStatus('Falha na Conexão', 'text-rose-400');
+            }
+        }
+
+        function updateCloudStatus(text, colorClass) {
+            const badge = document.getElementById('cloud-status-badge');
+            if (badge) {
+                badge.innerText = text;
+                badge.className = `${colorClass} font-bold`;
+            }
+        }
+
+        function getPlayerNickname() {
+            const input = document.getElementById('online-player-name');
+            const val = input ? input.value.trim() : '';
+            return val || `Jogador_${(currentUserUid || '0000').slice(-4).toUpperCase()}`;
+        }
+
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function listenToPublicRooms() {
+            if (!db || !currentUserUid) return;
+            if (publicRoomsUnsubscribe) publicRoomsUnsubscribe();
+
+            const roomsCol = collection(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms');
+            publicRoomsUnsubscribe = onSnapshot(roomsCol, (snapshot) => {
+                const listEl = document.getElementById('online-rooms-list');
+                if (!listEl) return;
+
+                const openRooms = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data && data.status === 'WAITING' && Array.isArray(data.members) && data.members.length > 0) {
+                        openRooms.push(data);
+                    }
+                });
+
+                if (openRooms.length === 0) {
+                    listEl.innerHTML = `<div class="text-slate-500 italic py-2 text-center">Nenhuma sala aguardando jogadores no momento. Crie uma acima!</div>`;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                openRooms.forEach(room => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center justify-between bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2';
+                    row.innerHTML = `
+                        <div>
+                            <span class="font-mono font-bold text-amber-400">${room.code}</span>
+                            <span class="text-slate-300 ml-2">Host: <strong>${room.hostName}</strong></span>
+                            <span class="text-slate-400 ml-2">(${room.members.length}/10)</span>
+                        </div>
+                        <button class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded text-[11px]">Entrar</button>
+                    `;
+                    row.querySelector('button').onclick = () => joinOnlineRoom(room.code);
+                    listEl.appendChild(row);
+                });
+            }, (err) => {
+                console.error('Erro ao listar salas:', err);
+            });
+        }
+
+        async function createOnlineRoom() {
+            if (!db || !currentUserUid) {
+                alertBox('Serviço em nuvem indisponível neste ambiente. Verifique a configuração do projeto.');
+                return;
+            }
+            const code = generateRoomCode();
+            const myName = getPlayerNickname();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
+
+            const initialRoomData = {
+                code,
+                hostUid: currentUserUid,
+                hostName: myName,
+                status: 'WAITING',
+                config: { ...matchConfig },
+                members: [{ uid: currentUserUid, name: myName }],
+                stateVersion: 0,
+                gameStateJson: '',
+                logs: []
+            };
+
+            try {
+                await setDoc(roomRef, initialRoomData);
+                onlineRoomCode = code;
+                isOnlineHost = true;
+                lastSyncedVersion = 0;
+                subscribeToRoom(code);
+            } catch (err) {
+                console.error('Erro ao criar sala:', err);
+                alertBox('Não foi possível criar a sala na nuvem.');
+            }
+        }
+
+        async function joinOnlineRoom(codeInput) {
+            if (!db || !currentUserUid) {
+                alertBox('Serviço em nuvem indisponível neste ambiente.');
+                return;
+            }
+            const code = (codeInput || '').trim().toUpperCase();
+            if (!code) {
+                alertBox('Digite o código da sala para entrar.');
+                return;
+            }
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
+            try {
+                const snap = await getDoc(roomRef);
+                if (!snap.exists()) {
+                    alertBox(`Sala "${code}" não encontrada.`);
+                    return;
+                }
+                const data = snap.data();
+                if (data.status !== 'WAITING') {
+                    alertBox('Esta partida já está em andamento!');
+                    return;
+                }
+                const members = Array.isArray(data.members) ? [...data.members] : [];
+                if (members.length >= 10 && !members.some(m => m.uid === currentUserUid)) {
+                    alertBox('A sala já atingiu o limite máximo de 10 jogadores.');
+                    return;
+                }
+
+                const myName = getPlayerNickname();
+                const existingIdx = members.findIndex(m => m.uid === currentUserUid);
+                if (existingIdx === -1) {
+                    members.push({ uid: currentUserUid, name: myName });
+                } else {
+                    members[existingIdx].name = myName;
+                }
+
+                await updateDoc(roomRef, { members });
+                onlineRoomCode = code;
+                isOnlineHost = (data.hostUid === currentUserUid);
+                lastSyncedVersion = data.stateVersion || 0;
+                subscribeToRoom(code);
+            } catch (err) {
+                console.error('Erro ao entrar na sala:', err);
+                alertBox('Erro ao conectar na sala.');
+            }
+        }
+
+        function subscribeToRoom(code) {
+            if (roomUnsubscribe) roomUnsubscribe();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
+
+            document.getElementById('online-join-create-box').classList.add('hidden');
+            document.getElementById('online-public-rooms-box').classList.add('hidden');
+            document.getElementById('online-waiting-room').classList.remove('hidden');
+            document.getElementById('waiting-room-code').innerText = code;
+
+            roomUnsubscribe = onSnapshot(roomRef, (snap) => {
+                if (!snap.exists()) {
+                    leaveOnlineRoomLocal();
+                    alertBox('A sala foi encerrada pelo anfitrião.');
+                    return;
+                }
+
+                const data = snap.data();
+                isOnlineHost = (data.hostUid === currentUserUid);
+
+                if (data.status === 'WAITING') {
+                    document.getElementById('game-screen').classList.add('hidden');
+                    document.getElementById('lobby-screen').classList.remove('hidden');
+                    document.getElementById('lobby-step-online').classList.remove('hidden');
+                    document.getElementById('lobby-step-config').classList.add('hidden');
+
+                    const members = data.members || [];
+                    document.getElementById('waiting-players-count').innerText = members.length;
+                    const listEl = document.getElementById('waiting-players-list');
+                    listEl.innerHTML = '';
+                    members.forEach(m => {
+                        const isHostBadge = m.uid === data.hostUid ? ' <i class="fa-solid fa-crown text-amber-400 ml-1"></i>' : '';
+                        const isMe = m.uid === currentUserUid ? 'border-amber-400 bg-amber-950/30' : 'border-slate-700 bg-slate-900';
+                        const card = document.createElement('div');
+                        card.className = `px-3 py-2 rounded-lg border ${isMe} text-xs font-semibold text-slate-200 truncate`;
+                        card.innerHTML = `${m.name}${isHostBadge}`;
+                        listEl.appendChild(card);
+                    });
+
+                    document.getElementById('waiting-host-controls').classList.toggle('hidden', !isOnlineHost);
+                    document.getElementById('waiting-guest-notice').classList.toggle('hidden', isOnlineHost);
+                    document.getElementById('btn-online-start-match').disabled = members.length < 2;
+                    if (data.config) {
+                        Object.assign(matchConfig, data.config);
+                        matchConfig.mode = 'ONLINE';
+                    }
+                } else if (data.status === 'PLAYING' && data.gameStateJson) {
+                    const incomingVersion = data.stateVersion || 0;
+                    if (incomingVersion <= lastSyncedVersion && !document.getElementById('game-screen').classList.contains('hidden')) {
+                        return;
+                    }
+                    lastSyncedVersion = incomingVersion;
+
+                    isApplyingRemoteState = true;
+                    try {
+                        if (data.config) {
+                            Object.assign(matchConfig, data.config);
+                            matchConfig.mode = 'ONLINE';
+                        }
+                        const parsedState = JSON.parse(data.gameStateJson);
+                        gameState = parsedState;
+
+                        document.getElementById('lobby-screen').classList.add('hidden');
+                        document.getElementById('game-screen').classList.remove('hidden');
+                        syncOnlineHudAndLogs(data.logs || []);
+                        updateUI();
+                        handleOnlinePostSyncUI();
+                    } finally {
+                        isApplyingRemoteState = false;
+                    }
+                }
+            }, (err) => {
+                console.error('Erro na sincronização da sala:', err);
+            });
+        }
+
+        async function pushOnlineState(newLogEntry = null, newLogClass = 'text-slate-300') {
+            if (matchConfig.mode !== 'ONLINE' || !onlineRoomCode || !db || isApplyingRemoteState) return;
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+            lastSyncedVersion += 1;
+
+            const payload = {
+                status: 'PLAYING',
+                stateVersion: lastSyncedVersion,
+                gameStateJson: JSON.stringify(gameState),
+                config: { ...matchConfig }
+            };
+
+            if (newLogEntry) {
+                window._onlineLogsBuffer = window._onlineLogsBuffer || [];
+                window._onlineLogsBuffer.push({ msg: newLogEntry, cls: newLogClass });
+                if (window._onlineLogsBuffer.length > 60) window._onlineLogsBuffer.shift();
+                payload.logs = window._onlineLogsBuffer;
+            }
+
+            try {
+                await updateDoc(roomRef, payload);
+            } catch (err) {
+                console.error('Erro ao enviar jogada para nuvem:', err);
+            }
+        }
+
+        function syncOnlineHudAndLogs(logs) {
+            window._onlineLogsBuffer = logs;
+            const logContainer = document.getElementById('game-log');
+            logContainer.innerHTML = '';
+            logs.forEach(item => {
+                const entry = document.createElement('div');
+                entry.className = item.cls || 'text-slate-300';
+                entry.innerHTML = `> ${item.msg}`;
+                logContainer.appendChild(entry);
+            });
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            const n = gameState.players.length;
+            document.getElementById('hud-mode-badge').innerText =
+                `Online (${onlineRoomCode}) • ${n} Jogadores${matchConfig.teamsEnabled ? ' • Equipes' : ''}`;
+
+            document.getElementById('asylum-center-box').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-other').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-self').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-embezzle').classList.toggle('hidden', !matchConfig.teamsEnabled);
+
+            const hasAmb = matchConfig.specialRole === 'AMBASSADOR' || n === 10;
+            const hasInq = matchConfig.specialRole === 'INQUISITOR' || n === 10;
+            document.getElementById('btn-exchange').classList.toggle('hidden', !hasAmb);
+            document.getElementById('btn-inquisitor-self').classList.toggle('hidden', !hasInq);
+            document.getElementById('btn-inquisitor-inspect').classList.toggle('hidden', !hasInq);
+            document.getElementById('btn-restart-match').classList.toggle('hidden', !isOnlineHost);
+        }
+
+        function handleOnlinePostSyncUI() {
+            hideReactionControls();
+            document.getElementById('action-buttons').classList.remove('hidden');
+
+            const alivePlayers = gameState.players.filter(p => p.cards.some(c => !c.revealed));
+            if (alivePlayers.length === 1 || gameState.phase === 'GAME_OVER') {
+                const winner = alivePlayers[0];
+                if (winner) {
+                    lastWinnerName = winner.name;
+                    document.getElementById('turn-indicator').innerText = 'FIM DE PARTIDA!';
+                    document.getElementById('status-message').innerText = `🏆 Vitória de ${winner.name}!`;
+                    triggerVictoryAnimation(winner);
+                }
+                return;
+            }
+
+            const current = gameState.players[gameState.turnIndex];
+            const me = getHumanPlayer();
+            if (!current || !me) return;
+
+            document.getElementById('turn-indicator').innerText = `Vez de: ${current.name}`;
+
+            if (gameState.phase === 'ACTION_SELECTION') {
+                if (current.uid === currentUserUid) {
+                    document.getElementById('status-message').innerText = current.coins >= 10
+                        ? 'Você tem 10+ moedas! É obrigatório dar um Golpe de Estado.'
+                        : 'Sua vez! Escolha uma ação.';
+                    startTurnTimer();
+                } else {
+                    stopTurnTimer();
+                    document.getElementById('status-message').innerText = `Aguardando jogada de ${current.name}...`;
+                }
+            } else if (gameState.phase === 'ACTION_REACTION_WINDOW') {
+                stopTurnTimer();
+                const action = gameState.pendingAction;
+                const actor = gameState.players.find(p => p.id === action.sourceId);
+                document.getElementById('status-message').innerText = `${actor.name} declarou uma ação. Reaja ou aguarde!`;
+                if (actor.uid !== currentUserUid && me.cards.some(c => !c.revealed)) {
+                    promptReactionsForAction();
+                }
+            } else if (gameState.phase === 'BLOCK_REACTION_WINDOW') {
+                stopTurnTimer();
+                const action = gameState.pendingAction;
+                const blocker = gameState.players.find(p => p.id === action.blockerId);
+                document.getElementById('status-message').innerText = `${blocker.name} bloqueou com ${CHARACTERS[action.blockRole].name}. Contestar?`;
+                if (blocker.uid !== currentUserUid && me.cards.some(c => !c.revealed) && canPlayerChallenge(me, blocker)) {
+                    renderBlockReactionButtonsForLocal(blocker, action.blockRole);
+                }
+            } else if (gameState.phase === 'LOSE_INFLUENCE_WINDOW' && gameState.pendingLosePlayerId !== undefined) {
+                stopTurnTimer();
+                const targetPlayer = gameState.players.find(p => p.id === gameState.pendingLosePlayerId);
+                if (targetPlayer && targetPlayer.uid === currentUserUid) {
+                    promptLoseInfluence(targetPlayer.id, () => {
+                        const after = gameState.pendingAfterLose || 'NEXT_TURN';
+                        gameState.pendingLosePlayerId = undefined;
+                        gameState.pendingAfterLose = undefined;
+                        if (after === 'RESOLVE_ACTION') resolvePendingAction();
+                        else nextTurn();
+                    });
+                } else if (targetPlayer) {
+                    document.getElementById('status-message').innerText = `Aguardando ${targetPlayer.name} escolher qual carta perder...`;
+                }
+            }
+        }
+
+        function leaveOnlineRoomLocal() {
+            if (roomUnsubscribe) {
+                roomUnsubscribe();
+                roomUnsubscribe = null;
+            }
+            onlineRoomCode = null;
+            isOnlineHost = false;
+            window._onlineLogsBuffer = [];
+            document.getElementById('online-waiting-room').classList.add('hidden');
+            document.getElementById('online-join-create-box').classList.remove('hidden');
+            document.getElementById('online-public-rooms-box').classList.remove('hidden');
+        }
+
+        async function leaveOnlineRoom() {
+            if (db && onlineRoomCode && currentUserUid) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+                try {
+                    const snap = await getDoc(roomRef);
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if (data.hostUid === currentUserUid) {
+                            await deleteDoc(roomRef);
+                        } else {
+                            const updatedMembers = (data.members || []).filter(m => m.uid !== currentUserUid);
+                            await updateDoc(roomRef, { members: updatedMembers });
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+            leaveOnlineRoomLocal();
+        }
+
+        function alertBox(message) {
+            const existing = document.getElementById('custom-toast-alert');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'custom-toast-alert';
+            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 border-2 border-amber-400 text-amber-200 px-5 py-3 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2';
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-amber-400 text-base"></i> <span>${message}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCloudServices();
+        });
+
+        const CHARACTERS = {
+            DUKE: { name: 'Duque', color: 'border-amber-500 bg-amber-950/50 text-amber-400', icon: 'fa-building-columns' },
+            ASSASSIN: { name: 'Assassino', color: 'border-rose-600 bg-rose-950/50 text-rose-400', icon: 'fa-skull' },
+            CONTESSA: { name: 'Condessa', color: 'border-purple-500 bg-purple-950/50 text-purple-400', icon: 'fa-shield-halved' },
+            CAPTAIN: { name: 'Capitão', color: 'border-sky-500 bg-sky-950/50 text-sky-400', icon: 'fa-mask' },
+            AMBASSADOR: { name: 'Embaixador', color: 'border-emerald-500 bg-emerald-950/50 text-emerald-400', icon: 'fa-arrows-rotate' },
+            INQUISITOR: { name: 'Inquisidor', color: 'border-violet-500 bg-violet-950/50 text-violet-400', icon: 'fa-magnifying-glass' }
+        };
+
+        const BOT_NAMES = [
+            'Lorde Arthur', 'Baronesa Elena', 'Conde Victor', 'Duquesa Sofía',
+            'General Lucas', 'Cardeal Richelieu', 'Lady Morgana', 'Marquês Dante', 'Dama Beatriz'
+        ];
+
+        let matchConfig = {
+            mode: 'SOLO',
+            numPlayers: 4,
+            specialRole: 'AMBASSADOR',
+            teamsEnabled: false,
+            timerEnabled: false,
+            timerSeconds: 30,
+            protectionScope: 'SELF_ONLY',
+            difficulty: 'NORMAL'
+        };
+
+        const DIFFICULTY_PROFILES = {
+            EASY: {
+                label: 'Fácil',
+                desc: 'Fácil: Bots passivos, raramente blefam ou contestam',
+                bluffRate: 0.12,
+                challengeRate: 0.08,
+                blockBluffRate: 0.10,
+                coupThreshold: 9,
+                smartTarget: false
+            },
+            NORMAL: {
+                label: 'Normal',
+                desc: 'Normal: Blefes e contestações moderadas',
+                bluffRate: 0.30,
+                challengeRate: 0.22,
+                blockBluffRate: 0.25,
+                coupThreshold: 8,
+                smartTarget: false
+            },
+            HARD: {
+                label: 'Difícil',
+                desc: 'Difícil: Bots agressivos, leem blefes e focam ameaças',
+                bluffRate: 0.45,
+                challengeRate: 0.36,
+                blockBluffRate: 0.38,
+                coupThreshold: 7,
+                smartTarget: true
+            },
+            NIGHTMARE: {
+                label: 'Pesadelo',
+                desc: 'Pesadelo: Dedução calculada e pressão constante',
+                bluffRate: 0.55,
+                challengeRate: 0.50,
+                blockBluffRate: 0.48,
+                coupThreshold: 7,
+                smartTarget: true
+            },
+            INFERNAL: {
+                label: 'Infernal',
+                desc: 'Infernal: Mestres da intriga — punem blefes e atacam sem piedade',
+                bluffRate: 0.62,
+                challengeRate: 0.68,
+                blockBluffRate: 0.58,
+                coupThreshold: 7,
+                smartTarget: true
+            }
+        };
+
+        let lastWinnerName = null;
+        let turnTimerInterval = null;
+        let turnTimeRemaining = 30;
+        let matchSessionId = 0;
+        let fireworksAnimId = null;
+        let currentVictoryWinner = null;
+        let currentVictoryThemeIdx = 0;
+
+        let gameState = {
+            deck: [],
+            bank: 50,
+            asylum: 0,
+            players: [],
+            turnIndex: 0,
+            pendingAction: null,
+            phase: 'ACTION_SELECTION'
+        };
+
+        function startTurnTimer() {
+            stopTurnTimer();
+            const badge = document.getElementById('hud-timer-badge');
+            const label = document.getElementById('hud-timer-seconds');
+            if (!matchConfig.timerEnabled) {
+                if (badge) badge.classList.add('hidden');
+                return;
+            }
+            turnTimeRemaining = matchConfig.timerSeconds;
+            if (badge) badge.classList.remove('hidden');
+            if (label) label.innerText = `${turnTimeRemaining}s`;
+
+            const currentSession = matchSessionId;
+            turnTimerInterval = setInterval(() => {
+                if (matchSessionId !== currentSession) {
+                    stopTurnTimer();
+                    return;
+                }
+                turnTimeRemaining--;
+                if (label) label.innerText = `${Math.max(0, turnTimeRemaining)}s`;
+                if (turnTimeRemaining <= 0) {
+                    stopTurnTimer();
+                    const current = gameState.players[gameState.turnIndex];
+                    if (current && gameState.phase === 'ACTION_SELECTION' && isLocalController(current)) {
+                        logMessage(`⏰ Tempo esgotado! ${current.name} comprou 1 moeda automaticamente.`, 'text-amber-400');
+                        executeAction({ type: 'INCOME', sourceId: current.id });
+                    }
+                }
+            }, 1000);
+        }
+
+        function stopTurnTimer() {
+            if (turnTimerInterval) {
+                clearInterval(turnTimerInterval);
+                turnTimerInterval = null;
+            }
+            const badge = document.getElementById('hud-timer-badge');
+            if (badge && !matchConfig.timerEnabled) {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function resetAllModalsAndTimers() {
+            stopTurnTimer();
+            stopFireworks();
+            hideReactionControls();
+            document.getElementById('action-buttons').classList.remove('hidden');
+            ['modal-target', 'modal-exchange', 'modal-inspect', 'modal-lose-influence', 'victory-overlay'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+            const fxLayer = document.getElementById('table-fx-layer');
+            if (fxLayer) fxLayer.innerHTML = '';
+            const particlesLayer = document.getElementById('victory-particles-layer');
+            if (particlesLayer) particlesLayer.innerHTML = '';
+            const spotlightsLayer = document.getElementById('victory-spotlights-layer');
+            if (spotlightsLayer) spotlightsLayer.innerHTML = '';
+        }
+
+        // =========================================================
+        // LOBBY & CONFIGURATION EVENT LISTENERS
+        // =========================================================
+        document.getElementById('btn-select-solo').onclick = () => {
+            matchConfig.mode = 'SOLO';
+            document.getElementById('cfg-difficulty-wrapper').classList.remove('hidden');
+            document.getElementById('cfg-players-wrapper').classList.remove('hidden');
+            document.getElementById('btn-launch-game').innerHTML = `<i class="fa-solid fa-play mr-2"></i> Iniciar Partida na Mesa`;
+            document.getElementById('lobby-step-mode').classList.add('hidden');
+            document.getElementById('lobby-step-config').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-select-online').onclick = () => {
+            matchConfig.mode = 'ONLINE';
+            document.getElementById('lobby-step-mode').classList.add('hidden');
+            document.getElementById('lobby-step-online').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-back-mode-from-online').onclick = async () => {
+            if (onlineRoomCode) await leaveOnlineRoom();
+            document.getElementById('lobby-step-online').classList.add('hidden');
+            document.getElementById('lobby-step-mode').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-online-create-room').onclick = () => createOnlineRoom();
+        document.getElementById('btn-online-join-room').onclick = () => {
+            const code = document.getElementById('online-room-code-input').value;
+            joinOnlineRoom(code);
+        };
+        document.getElementById('btn-copy-room-code').onclick = () => {
+            if (!onlineRoomCode) return;
+            const temp = document.createElement('textarea');
+            temp.value = onlineRoomCode;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            temp.remove();
+            alertBox(`Código ${onlineRoomCode} copiado para a área de transferência!`);
+        };
+        document.getElementById('btn-leave-online-room').onclick = () => leaveOnlineRoom();
+
+        document.getElementById('btn-online-configure-rules').onclick = () => {
+            document.getElementById('cfg-difficulty-wrapper').classList.add('hidden');
+            document.getElementById('cfg-players-wrapper').classList.add('hidden');
+            document.getElementById('btn-launch-game').innerHTML = `<i class="fa-solid fa-check mr-2"></i> Salvar Regras da Sala`;
+            document.getElementById('lobby-step-online').classList.add('hidden');
+            document.getElementById('lobby-step-config').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-online-start-match').onclick = () => {
+            startNewMatch(false);
+        };
+
+        document.getElementById('cfg-players').oninput = (e) => {
+            const val = parseInt(e.target.value, 10);
+            matchConfig.numPlayers = val;
+            document.getElementById('cfg-players-val').innerText = val;
+            const copies = getCopiesPerRole(val);
+            const totalRoles = val === 10 ? 6 : 5;
+            document.getElementById('cfg-deck-scale-info').innerText =
+                `Baralho: ${copies} cópias de cada personagem (${copies * totalRoles} cartas)${val === 10 ? ' • Embaixador + Inquisidor ativos!' : ''}`;
+        };
+
+        document.getElementById('cfg-timer-seconds').oninput = (e) => {
+            matchConfig.timerSeconds = parseInt(e.target.value, 10);
+            document.getElementById('cfg-timer-val').innerText = `${matchConfig.timerSeconds}s`;
+        };
+
+        document.querySelectorAll('.cfg-prot-btn').forEach(btn => {
+            btn.onclick = () => {
+                matchConfig.protectionScope = btn.dataset.prot;
+                document.querySelectorAll('.cfg-prot-btn').forEach(b => {
+                    b.className = 'cfg-prot-btn p-3 rounded-lg border border-slate-700 bg-slate-900 text-left transition';
+                    b.querySelector('div:first-child').className = 'text-xs font-bold text-slate-300';
+                });
+                btn.className = 'cfg-prot-btn p-3 rounded-lg border-2 border-amber-500 bg-amber-950/30 text-left transition';
+                btn.querySelector('div:first-child').className = 'text-xs font-bold text-amber-300';
+            };
+        });
+
+        document.querySelectorAll('.cfg-diff-btn').forEach(btn => {
+            btn.onclick = () => {
+                matchConfig.difficulty = btn.dataset.diff;
+                document.querySelectorAll('.cfg-diff-btn').forEach(b => {
+                    b.className = 'cfg-diff-btn py-2 px-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition';
+                });
+                btn.className = 'cfg-diff-btn py-2 px-2 rounded-lg border-2 border-amber-500 bg-amber-950/40 text-amber-300 font-bold text-xs transition';
+                document.getElementById('cfg-diff-desc').innerText = DIFFICULTY_PROFILES[matchConfig.difficulty].desc;
+            };
+        });
+
+        document.getElementById('btn-victory-rematch').onclick = () => startNewMatch(false);
+        document.getElementById('btn-victory-cycle-anim').onclick = () => {
+            if (currentVictoryWinner) {
+                currentVictoryThemeIdx = (currentVictoryThemeIdx + 1) % 6;
+                renderVictoryTheme(currentVictoryWinner, currentVictoryThemeIdx);
+            }
+        };
+        document.getElementById('btn-victory-close').onclick = () => {
+            stopFireworks();
+            document.getElementById('victory-overlay').classList.add('hidden');
+        };
+
+        document.getElementById('btn-back-mode').onclick = () => {
+            document.getElementById('lobby-step-config').classList.add('hidden');
+            if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
+                document.getElementById('lobby-step-online').classList.remove('hidden');
+            } else {
+                document.getElementById('lobby-step-mode').classList.remove('hidden');
+            }
+        };
+
+        document.querySelectorAll('.cfg-role-btn').forEach(btn => {
+            btn.onclick = () => {
+                matchConfig.specialRole = btn.dataset.role;
+                document.querySelectorAll('.cfg-role-btn').forEach(b => {
+                    b.className = 'cfg-role-btn py-2 px-3 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-bold text-xs transition';
+                });
+                btn.className = 'cfg-role-btn py-2 px-3 rounded-lg border-2 border-emerald-500 bg-emerald-950/50 text-emerald-300 font-bold text-xs transition';
+            };
+        });
+
+        document.getElementById('cfg-teams').onchange = (e) => {
+            matchConfig.teamsEnabled = e.target.checked;
+        };
+
+        document.getElementById('cfg-timer-enabled').onchange = (e) => {
+            matchConfig.timerEnabled = e.target.checked;
+            const box = document.getElementById('cfg-timer-box');
+            if (e.target.checked) {
+                box.classList.remove('opacity-40', 'pointer-events-none');
+            } else {
+                box.classList.add('opacity-40', 'pointer-events-none');
+            }
+        };
+
+        document.getElementById('btn-launch-game').onclick = async () => {
+            if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
+                if (db && isOnlineHost) {
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+                    await updateDoc(roomRef, { config: { ...matchConfig } });
+                }
+                document.getElementById('lobby-step-config').classList.add('hidden');
+                document.getElementById('lobby-step-online').classList.remove('hidden');
+                alertBox('Regras da sala online atualizadas!');
+                return;
+            }
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            startNewMatch();
+        };
+
+        document.getElementById('btn-back-lobby').onclick = async () => {
+            matchSessionId++;
+            resetAllModalsAndTimers();
+            if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
+                await leaveOnlineRoom();
+            }
+            document.getElementById('btn-restart-match').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('lobby-step-config').classList.add('hidden');
+            document.getElementById('lobby-step-online').classList.add('hidden');
+            document.getElementById('lobby-step-mode').classList.remove('hidden');
+            document.getElementById('lobby-screen').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-restart-match').onclick = () => startNewMatch(true);
+        document.getElementById('btn-open-rules').onclick = () => document.getElementById('modal-rules').classList.remove('hidden');
+        document.getElementById('btn-close-rules').onclick = () => document.getElementById('modal-rules').classList.add('hidden');
+
+        // =========================================================
+        // DECK & MATCH INITIALIZATION
+        // =========================================================
+        function getCopiesPerRole(numPlayers) {
+            if (numPlayers <= 6) return 3;
+            if (numPlayers <= 8) return 4;
+            return 5;
+        }
+
+        async function startNewMatch(isManualRestart = false) {
+            matchSessionId++;
+            resetAllModalsAndTimers();
+
+            if (isManualRestart) {
+                lastWinnerName = null;
+            }
+
+            let rawPlayers = [];
+            if (matchConfig.mode === 'ONLINE' && onlineRoomCode && db) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+                const snap = await getDoc(roomRef);
+                const members = snap.exists() ? (snap.data().members || []) : [];
+                rawPlayers = members.map(m => ({
+                    uid: m.uid,
+                    name: m.name,
+                    isHuman: true,
+                    coins: 2,
+                    cards: [],
+                    team: null
+                }));
+                matchConfig.numPlayers = rawPlayers.length;
+                window._onlineLogsBuffer = [];
+            } else {
+                const nSolo = matchConfig.numPlayers;
+                rawPlayers = [
+                    { uid: 'HUMAN', name: 'Você', isHuman: true, coins: 2, cards: [], team: null }
+                ];
+                for (let i = 1; i < nSolo; i++) {
+                    rawPlayers.push({
+                        uid: `BOT_${i}`,
+                        name: BOT_NAMES[i - 1],
+                        isHuman: false,
+                        coins: 2,
+                        cards: [],
+                        team: null
+                    });
+                }
+            }
+
+            const n = rawPlayers.length;
+            const copies = getCopiesPerRole(n);
+
+            let activeRoles = ['DUKE', 'ASSASSIN', 'CONTESSA', 'CAPTAIN'];
+            if (n === 10) {
+                activeRoles.push('AMBASSADOR', 'INQUISITOR');
+            } else {
+                activeRoles.push(matchConfig.specialRole);
+            }
+
+            let deck = [];
+            activeRoles.forEach(role => {
+                for (let i = 0; i < copies; i++) deck.push(role);
+            });
+            gameState.deck = deck.sort(() => Math.random() - 0.5);
+            gameState.bank = 60 - (n * 2);
+            gameState.asylum = 0;
+
+            rawPlayers = rawPlayers.sort(() => Math.random() - 0.5);
+
+            const startWithCatholic = Math.random() < 0.5;
+            rawPlayers.forEach((p, idx) => {
+                p.id = idx;
+                if (matchConfig.teamsEnabled) {
+                    const isCatholic = (idx % 2 === 0) ? startWithCatholic : !startWithCatholic;
+                    p.team = isCatholic ? 'CATHOLIC' : 'PROTESTANT';
+                }
+                p.cards = [
+                    { character: gameState.deck.pop(), revealed: false },
+                    { character: gameState.deck.pop(), revealed: false }
+                ];
+            });
+
+            gameState.players = rawPlayers;
+
+            let starterIndex = -1;
+            if (lastWinnerName) {
+                starterIndex = gameState.players.findIndex(p => p.name === lastWinnerName);
+            }
+            if (starterIndex === -1) {
+                starterIndex = Math.floor(Math.random() * n);
+            }
+
+            gameState.turnIndex = starterIndex;
+            gameState.pendingAction = null;
+            gameState.phase = 'ACTION_SELECTION';
+
+            const diffLabel = DIFFICULTY_PROFILES[matchConfig.difficulty]?.label || 'Normal';
+            const modeLabel = matchConfig.mode === 'ONLINE' ? `Online (${onlineRoomCode})` : `Solo (${diffLabel})`;
+            document.getElementById('hud-mode-badge').innerText =
+                `${modeLabel} • ${n} Jogadores${matchConfig.teamsEnabled ? ' • Equipes' : ''}`;
+
+            document.getElementById('asylum-center-box').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-other').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-convert-self').classList.toggle('hidden', !matchConfig.teamsEnabled);
+            document.getElementById('btn-embezzle').classList.toggle('hidden', !matchConfig.teamsEnabled);
+
+            const hasAmb = activeRoles.includes('AMBASSADOR');
+            const hasInq = activeRoles.includes('INQUISITOR');
+            document.getElementById('btn-exchange').classList.toggle('hidden', !hasAmb);
+            document.getElementById('btn-inquisitor-self').classList.toggle('hidden', !hasInq);
+            document.getElementById('btn-inquisitor-inspect').classList.toggle('hidden', !hasInq);
+
+            document.getElementById('game-log').innerHTML = '';
+            logMessage(`Assentos sorteados aleatoriamente na mesa!`, 'text-slate-400');
+            if (lastWinnerName && gameState.players[starterIndex].name === lastWinnerName) {
+                logMessage(`👑 ${lastWinnerName} venceu a última partida e começa jogando!`, 'text-amber-400 font-bold');
+            } else {
+                logMessage(`🎲 ${gameState.players[starterIndex].name} foi sorteado para iniciar a partida!`, 'text-amber-400 font-bold');
+            }
+
+            if (matchConfig.mode === 'ONLINE') {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
+                await pushOnlineState();
+            }
+
+            updateUI();
+            checkTurnPhase();
+        }
+
+        function logMessage(msg, className = 'text-slate-300') {
+            const logContainer = document.getElementById('game-log');
+            const entry = document.createElement('div');
+            entry.className = className;
+            entry.innerHTML = `> ${msg}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            if (matchConfig.mode === 'ONLINE' && !isApplyingRemoteState) {
+                window._onlineLogsBuffer = window._onlineLogsBuffer || [];
+                window._onlineLogsBuffer.push({ msg, cls: className });
+                if (window._onlineLogsBuffer.length > 60) window._onlineLogsBuffer.shift();
+            }
+        }
+
+        // =========================================================
+        // CIRCULAR TABLE & UI RENDERING
+        // =========================================================
+        function getHumanPlayer() {
+            if (matchConfig.mode === 'ONLINE' && currentUserUid) {
+                return gameState.players.find(p => p.uid === currentUserUid) || gameState.players[0];
+            }
+            return gameState.players.find(p => p.isHuman);
+        }
+
+        function isLocalController(player) {
+            if (!player) return false;
+            if (matchConfig.mode === 'ONLINE') {
+                return player.uid === currentUserUid;
+            }
+            return player.isHuman;
+        }
+
+        function updateUI() {
+            document.getElementById('bank-coins').innerText = gameState.bank;
+            document.getElementById('deck-count').innerText = gameState.deck.length;
+            document.getElementById('asylum-coins').innerText = gameState.asylum;
+
+            const human = getHumanPlayer();
+            if (!human) return;
+
+            document.getElementById('human-name-label').innerText = `${human.name} (Assento ${human.id + 1})`;
+            document.getElementById('human-coins').innerText = human.coins;
+
+            const teamBadge = document.getElementById('human-team-badge');
+            if (matchConfig.teamsEnabled && human.team) {
+                teamBadge.classList.remove('hidden');
+                if (human.team === 'CATHOLIC') {
+                    teamBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40';
+                    teamBadge.innerHTML = `<i class="fa-solid fa-cross mr-1"></i>Católico`;
+                } else {
+                    teamBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40';
+                    teamBadge.innerHTML = `<i class="fa-solid fa-fire-flame-curved mr-1"></i>Protestante`;
+                }
+            } else {
+                teamBadge.classList.add('hidden');
+            }
+
+            const cardsContainer = document.getElementById('human-cards-container');
+            cardsContainer.innerHTML = '';
+            human.cards.forEach(card => {
+                const char = CHARACTERS[card.character];
+                const el = document.createElement('div');
+                if (card.revealed) {
+                    el.className = 'w-24 h-32 rounded-xl border-2 border-slate-700 bg-slate-950/90 flex flex-col justify-center items-center p-2 opacity-45 grayscale';
+                    el.innerHTML = `
+                        <i class="fa-solid ${char.icon} text-xl mb-1 text-slate-500"></i>
+                        <span class="text-[11px] font-bold line-through text-slate-500">${char.name}</span>
+                        <span class="text-[9px] text-rose-500 uppercase font-bold mt-1">Revelada</span>
+                    `;
+                } else {
+                    el.className = `w-24 h-32 rounded-xl border-2 ${char.color} shadow-lg flex flex-col justify-between items-center p-2.5`;
+                    el.innerHTML = `
+                        <span class="text-[9px] uppercase font-bold tracking-wider opacity-80">Influência</span>
+                        <i class="fa-solid ${char.icon} text-2xl"></i>
+                        <span class="text-xs font-bold">${char.name}</span>
+                    `;
+                }
+                cardsContainer.appendChild(el);
+            });
+
+            renderCircularSeats();
+
+            const current = gameState.players[gameState.turnIndex];
+            const isHumanTurn = current && isLocalController(current) && gameState.phase === 'ACTION_SELECTION';
+
+            document.querySelectorAll('#action-buttons button').forEach(btn => {
+                btn.disabled = !isHumanTurn;
+            });
+
+            if (isHumanTurn) {
+                if (human.coins >= 10) {
+                    document.querySelectorAll('#action-buttons button').forEach(btn => {
+                        if (btn.id !== 'btn-coup') btn.disabled = true;
+                    });
+                } else {
+                    if (human.coins < 3) document.getElementById('btn-assassinate').disabled = true;
+                    if (human.coins < 7) document.getElementById('btn-coup').disabled = true;
+                    if (matchConfig.teamsEnabled) {
+                        if (human.coins < 1) document.getElementById('btn-convert-other').disabled = true;
+                        if (human.coins < 2) document.getElementById('btn-convert-self').disabled = true;
+                        if (gameState.asylum <= 0) document.getElementById('btn-embezzle').disabled = true;
+                    }
+                }
+            }
+        }
+
+        function renderCircularSeats() {
+            const layer = document.getElementById('circular-seats-layer');
+            layer.innerHTML = '';
+
+            const n = gameState.players.length;
+            const human = getHumanPlayer();
+            const humanIdx = human ? human.id : 0;
+
+            gameState.players.forEach((p, idx) => {
+                const relativeOffset = (idx - humanIdx + n) % n;
+                const angle = (Math.PI / 2) + (relativeOffset * (2 * Math.PI / n));
+
+                const rx = 43;
+                const ry = 41;
+                const leftPct = 50 + rx * Math.cos(angle);
+                const topPct = 50 + ry * Math.sin(angle);
+
+                const isTurn = gameState.players[gameState.turnIndex].id === p.id;
+                const isDead = !p.cards.some(c => !c.revealed);
+
+                const seat = document.createElement('div');
+                seat.style.left = `${leftPct}%`;
+                seat.style.top = `${topPct}%`;
+                seat.className = `seat-card pointer-events-auto absolute w-28 sm:w-32 bg-slate-900/95 backdrop-blur rounded-xl p-2 border-2 ${
+                    isTurn ? 'border-amber-400 ring-2 ring-amber-400/40 scale-105 z-20' :
+                    isLocalController(p) ? 'border-emerald-500/70' : 'border-slate-700'
+                } ${isDead ? 'opacity-40 grayscale' : ''} shadow-xl`;
+
+                let teamTag = '';
+                if (matchConfig.teamsEnabled && p.team) {
+                    teamTag = p.team === 'CATHOLIC'
+                        ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold">Católico</span>`
+                        : `<span class="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">Protest.</span>`;
+                }
+
+                const cardsMini = p.cards.map(c => {
+                    if (c.revealed) {
+                        const char = CHARACTERS[c.character];
+                        return `<div class="w-9 h-10 rounded border border-rose-700 bg-slate-950 flex flex-col items-center justify-center text-[8px] text-rose-400 font-bold" title="${char.name} (Revelada)">
+                            <i class="fa-solid ${char.icon}"></i>
+                            <span>${char.name.slice(0, 4)}</span>
+                        </div>`;
+                    }
+                    return `<div class="w-9 h-10 rounded border border-slate-600 bg-gradient-to-b from-slate-800 to-slate-950 flex items-center justify-center text-amber-500/70 text-xs">
+                        <i class="fa-solid fa-shield"></i>
+                    </div>`;
+                }).join('');
+
+                seat.innerHTML = `
+                    <div class="flex items-center justify-between gap-1 mb-1">
+                        <span class="text-[11px] font-bold truncate ${isLocalController(p) ? 'text-amber-300' : 'text-slate-100'}">${p.name}</span>
+                        <span class="text-[11px] font-bold text-amber-400 shrink-0"><i class="fa-solid fa-coins"></i> ${p.coins}</span>
+                    </div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[9px] text-slate-400">#${p.id + 1}</span>
+                        ${teamTag}
+                    </div>
+                    <div class="flex justify-center gap-1.5">
+                        ${cardsMini}
+                    </div>
+                `;
+
+                layer.appendChild(seat);
+            });
+        }
+
+        // =========================================================
+        // TURN PROGRESSION & TEAM VALIDATION HELPERS
+        // =========================================================
+        function checkTeamConflictActive() {
+            if (!matchConfig.teamsEnabled) return false;
+            const aliveTeams = new Set(
+                gameState.players
+                    .filter(p => p.cards.some(c => !c.revealed))
+                    .map(p => p.team)
+            );
+            return aliveTeams.size > 1;
+        }
+
+        function areAlliesRestricted(playerA, playerB) {
+            if (!playerA || !playerB) return false;
+            if (playerA.id === playerB.id) return false;
+            return checkTeamConflictActive() && playerA.team === playerB.team;
+        }
+
+        function canTargetOpponent(source, target) {
+            if (source.id === target.id) return false;
+            if (!target.cards.some(c => !c.revealed)) return false;
+            if (areAlliesRestricted(source, target)) {
+                return false;
+            }
+            return true;
+        }
+
+        function checkTurnPhase() {
+            const currentSession = matchSessionId;
+            const alivePlayers = gameState.players.filter(p => p.cards.some(c => !c.revealed));
+
+            if (alivePlayers.length === 1) {
+                stopTurnTimer();
+                gameState.phase = 'GAME_OVER';
+                const winner = alivePlayers[0];
+                lastWinnerName = winner.name;
+                document.getElementById('turn-indicator').innerText = 'FIM DE PARTIDA!';
+                document.getElementById('status-message').innerText = `🏆 Vitória de ${winner.name}! (Começará a próxima partida)`;
+                logMessage(`🏆 FIM DE JOGO! ${winner.name} venceu e conquistou o direito de iniciar a próxima partida!`, 'text-amber-400 font-bold text-sm');
+                if (matchConfig.mode === 'ONLINE') pushOnlineState();
+                updateUI();
+                triggerVictoryAnimation(winner);
+                return;
+            }
+
+            const current = gameState.players[gameState.turnIndex];
+            document.getElementById('turn-indicator').innerText = `Vez de: ${current.name}`;
+
+            if (isLocalController(current)) {
+                document.getElementById('status-message').innerText = current.coins >= 10
+                    ? 'Você tem 10+ moedas! É obrigatório dar um Golpe de Estado.'
+                    : 'Sua vez! Escolha uma ação.';
+                startTurnTimer();
+            } else if (matchConfig.mode === 'ONLINE') {
+                stopTurnTimer();
+                document.getElementById('status-message').innerText = `Aguardando jogada de ${current.name}...`;
+            } else {
+                document.getElementById('status-message').innerText = `${current.name} está decidindo sua jogada...`;
+                startTurnTimer();
+                setTimeout(() => {
+                    if (matchSessionId !== currentSession) return;
+                    botTakeTurn(current);
+                }, 1100);
+            }
+        }
+
+        function nextTurn() {
+            stopTurnTimer();
+            hideReactionControls();
+            document.getElementById('action-buttons').classList.remove('hidden');
+
+            do {
+                gameState.turnIndex = (gameState.turnIndex + 1) % gameState.players.length;
+            } while (!gameState.players[gameState.turnIndex].cards.some(c => !c.revealed));
+
+            gameState.phase = 'ACTION_SELECTION';
+            gameState.pendingAction = null;
+            if (matchConfig.mode === 'ONLINE') pushOnlineState();
+            updateUI();
+            checkTurnPhase();
+        }
+
+        function hideReactionControls() {
+            const container = document.getElementById('reaction-controls');
+            container.innerHTML = '';
+            container.classList.add('hidden');
+        }
+
+        // =========================================================
+        // VISUAL ANIMATIONS (STEAL, PARTIAL DEATH, ELIMINATION, VICTORY)
+        // =========================================================
+        function getPlayerSeatCoords(playerId) {
+            const n = gameState.players.length;
+            const human = getHumanPlayer();
+            const humanIdx = human ? human.id : 0;
+            const relativeOffset = (playerId - humanIdx + n) % n;
+            const angle = (Math.PI / 2) + (relativeOffset * (2 * Math.PI / n));
+            return {
+                x: 50 + 43 * Math.cos(angle),
+                y: 50 + 41 * Math.sin(angle)
+            };
+        }
+
+        function triggerStealAnimation(thief, victim, amount) {
+            const fxLayer = document.getElementById('table-fx-layer');
+            if (!fxLayer || amount <= 0) return;
+
+            const start = getPlayerSeatCoords(victim.id);
+            const end = getPlayerSeatCoords(thief.id);
+
+            for (let i = 0; i < Math.min(amount * 3, 8); i++) {
+                const coin = document.createElement('div');
+                coin.className = 'absolute text-amber-400 text-base drop-shadow-lg transition-all duration-700 ease-out';
+                coin.style.left = `${start.x}%`;
+                coin.style.top = `${start.y}%`;
+                coin.innerHTML = '<i class="fa-solid fa-coins"></i>';
+                fxLayer.appendChild(coin);
+
+                setTimeout(() => {
+                    const jitterX = (Math.random() - 0.5) * 4;
+                    const jitterY = (Math.random() - 0.5) * 4;
+                    coin.style.left = `${end.x + jitterX}%`;
+                    coin.style.top = `${end.y + jitterY}%`;
+                    coin.style.transform = 'scale(1.35)';
+                }, 40 + i * 70);
+
+                setTimeout(() => coin.remove(), 950 + i * 70);
+            }
+
+            const banner = document.createElement('div');
+            banner.className = 'event-banner-anim absolute bg-sky-950/95 border border-sky-400 text-sky-200 px-3 py-1 rounded-full text-xs font-bold shadow-xl whitespace-nowrap';
+            banner.style.left = `${end.x}%`;
+            banner.style.top = `${Math.max(12, end.y - 8)}%`;
+            banner.innerHTML = `<i class="fa-solid fa-mask text-amber-400 mr-1"></i> +${amount} Moeda(s) Roubadas!`;
+            fxLayer.appendChild(banner);
+            setTimeout(() => banner.remove(), 2400);
+        }
+
+        function triggerDeathAnimation(player, isTotalElimination) {
+            const fxLayer = document.getElementById('table-fx-layer');
+            const gameScreen = document.getElementById('game-screen');
+            if (gameScreen) {
+                gameScreen.classList.remove('shake-effect');
+                void gameScreen.offsetWidth;
+                gameScreen.classList.add('shake-effect');
+            }
+            if (!fxLayer) return;
+
+            const pos = getPlayerSeatCoords(player.id);
+            const badge = document.createElement('div');
+            badge.style.left = `${pos.x}%`;
+            badge.style.top = `${pos.y}%`;
+
+            if (isTotalElimination) {
+                badge.className = 'event-banner-anim absolute bg-rose-950/95 border-2 border-rose-500 text-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-2xl whitespace-nowrap flex items-center gap-1.5';
+                badge.innerHTML = `<i class="fa-solid fa-skull-crossbones text-rose-400 text-sm"></i> ${player.name} ELIMINADO!`;
+            } else {
+                badge.className = 'event-banner-anim absolute bg-amber-950/95 border border-amber-500 text-amber-200 px-3 py-1 rounded-xl text-xs font-bold shadow-xl whitespace-nowrap flex items-center gap-1.5';
+                badge.innerHTML = `<i class="fa-solid fa-heart-crack text-rose-400"></i> ${player.name} perdeu 1 Vida!`;
+            }
+
+            fxLayer.appendChild(badge);
+            setTimeout(() => badge.remove(), 2400);
+        }
+
+        function playVictoryFanfare(themeKey) {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const now = ctx.currentTime;
+
+                const notes = themeKey === 'TAUNT_CHUPA'
+                    ? [523.25, 493.88, 466.16, 440.00, 587.33, 783.99]
+                    : [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
+
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = idx === notes.length - 1 ? 'triangle' : 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.13);
+
+                    gain.gain.setValueAtTime(0.001, now + idx * 0.13);
+                    gain.gain.exponentialRampToValueAtTime(0.14, now + idx * 0.13 + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.13 + (idx === notes.length - 1 ? 0.65 : 0.22));
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now + idx * 0.13);
+                    osc.stop(now + idx * 0.13 + 0.7);
+                });
+            } catch (e) {}
+        }
+
+        function startFireworks(paletteColors) {
+            stopFireworks();
+            const canvas = document.getElementById('victory-fireworks-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const colors = paletteColors || ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#f87171'];
+
+            function createExplosion(x, y) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                for (let i = 0; i < 42; i++) {
+                    const angle = (Math.PI * 2 * i) / 42 + (Math.random() - 0.5) * 0.2;
+                    const speed = 1.8 + Math.random() * 4.5;
+                    particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        alpha: 1,
+                        decay: 0.014 + Math.random() * 0.015,
+                        color,
+                        size: 2 + Math.random() * 2.5
+                    });
+                }
+            }
+
+            createExplosion(canvas.width * 0.25, canvas.height * 0.3);
+            createExplosion(canvas.width * 0.75, canvas.height * 0.28);
+
+            let frameCount = 0;
+            function loop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                frameCount++;
+                if (frameCount % 38 === 0) {
+                    createExplosion(
+                        canvas.width * (0.15 + Math.random() * 0.7),
+                        canvas.height * (0.15 + Math.random() * 0.45)
+                    );
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.055;
+                    p.vx *= 0.985;
+                    p.alpha -= p.decay;
+
+                    if (p.alpha <= 0) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                fireworksAnimId = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function stopFireworks() {
+            if (fireworksAnimId) {
+                cancelAnimationFrame(fireworksAnimId);
+                fireworksAnimId = null;
+            }
+            const canvas = document.getElementById('victory-fireworks-canvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function spawnSpotlights(layer) {
+            layer.innerHTML = `
+                <div class="victory-spotlight" style="left: 20%; animation-delay: 0s;"></div>
+                <div class="victory-spotlight" style="left: 50%; animation-delay: -1.1s;"></div>
+                <div class="victory-spotlight" style="left: 80%; animation-delay: -2.2s;"></div>
+            `;
+        }
+
+        function triggerVictoryAnimation(winner) {
+            currentVictoryWinner = winner;
+            currentVictoryThemeIdx = Math.floor(Math.random() * 6);
+            renderVictoryTheme(winner, currentVictoryThemeIdx);
+            document.getElementById('victory-overlay').classList.remove('hidden');
+        }
+
+        function renderVictoryTheme(winner, themeIndex) {
+            const stage = document.getElementById('victory-visual-stage');
+            const titleEl = document.getElementById('victory-title');
+            const subtitleEl = document.getElementById('victory-subtitle');
+            const tauntBox = document.getElementById('victory-taunt-box');
+            const themeBadge = document.getElementById('victory-theme-badge');
+            const particlesLayer = document.getElementById('victory-particles-layer');
+            const spotlightsLayer = document.getElementById('victory-spotlights-layer');
+            const cardBox = document.getElementById('victory-card-box');
+
+            particlesLayer.innerHTML = '';
+            spotlightsLayer.innerHTML = '';
+            tauntBox.classList.add('hidden');
+            stage.className = 'min-h-[135px] flex flex-col items-center justify-center rounded-2xl p-3';
+
+            cardBox.classList.remove('victory-modal-enter');
+            void cardBox.offsetWidth;
+            cardBox.classList.add('victory-modal-enter');
+
+            const losers = gameState.players.filter(p => p.id !== winner.id);
+            const randomLoser = losers.length > 0 ? losers[Math.floor(Math.random() * losers.length)] : null;
+
+            const themes = [
+                'IMPERIAL_CORONATION',
+                'GOLD_TREASURE_RAIN',
+                'TAUNT_CHUPA',
+                'DANCING_COURT',
+                'ROYAL_FIREWORKS',
+                'MASTER_COUP'
+            ];
+            const chosenTheme = themes[themeIndex % themes.length];
+
+            playVictoryFanfare(chosenTheme);
+
+            titleEl.innerText = isLocalController(winner) ? '👑 VOCÊ DOMINOU A CORTE!' : `👑 VITÓRIA DE ${winner.name.toUpperCase()}!`;
+            subtitleEl.innerText = `${winner.name} sobreviveu às intrigas, superou todos os rivais e conquistou o poder absoluto.`;
+
+            if (chosenTheme === 'IMPERIAL_CORONATION') {
+                themeBadge.innerText = 'Coroação Imperial';
+                spawnSpotlights(spotlightsLayer);
+                stage.innerHTML = `
+                    <div class="relative flex items-center justify-center">
+                        <div class="w-24 h-24 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-5xl text-amber-400 crown-hero">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-amber-300 font-bold mt-3">Novo Soberano de COUPLEGAS!</span>
+                `;
+                spawnCrownRainParticles(particlesLayer);
+                spawnConfettiParticles(particlesLayer, 45);
+                startFireworks(['#fbbf24', '#fef08a', '#f59e0b']);
+            } else if (chosenTheme === 'GOLD_TREASURE_RAIN') {
+                themeBadge.innerText = 'Fortuna Suprema';
+                spawnSpotlights(spotlightsLayer);
+                stage.innerHTML = `
+                    <div class="flex items-center gap-3 text-4xl text-amber-300 crown-hero">
+                        <i class="fa-solid fa-coins"></i>
+                        <i class="fa-solid fa-sack-dollar text-5xl text-amber-400"></i>
+                        <i class="fa-solid fa-coins"></i>
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-amber-400 font-bold mt-3">Todo o Ouro do Tesouro é Seu!</span>
+                `;
+                spawnCoinRainParticles(particlesLayer);
+            } else if (chosenTheme === 'TAUNT_CHUPA') {
+                themeBadge.innerText = 'Humilhação na Corte';
+                spawnSpotlights(spotlightsLayer);
+                stage.innerHTML = `
+                    <div class="flex items-center justify-center gap-4 text-4xl text-rose-400">
+                        <i class="fa-solid fa-skull-crossbones dancer-anim"></i>
+                        <div class="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl text-amber-400 crown-hero">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        <i class="fa-solid fa-bolt dancer-anim" style="animation-delay: 0.25s;"></i>
+                    </div>
+                `;
+                if (randomLoser) {
+                    tauntBox.innerHTML = `<i class="fa-solid fa-fire text-amber-400 mr-1.5"></i> CHUPA OTÁRIO, ${randomLoser.name.toUpperCase()}! <i class="fa-solid fa-fire text-amber-400 ml-1.5"></i>`;
+                    tauntBox.classList.remove('hidden');
+                }
+                spawnConfettiParticles(particlesLayer, 50);
+                spawnCrownRainParticles(particlesLayer, 20);
+                startFireworks(['#f43f5e', '#fbbf24', '#fb7185']);
+            } else if (chosenTheme === 'DANCING_COURT') {
+                themeBadge.innerText = 'Baile de Gala da Corte';
+                stage.classList.add('party-stage-box', 'border');
+                spawnSpotlights(spotlightsLayer);
+                stage.innerHTML = `
+                    <div class="flex items-end justify-center gap-4 sm:gap-6 py-1">
+                        ${getDancerSilhouetteSVG('#f472b6', 54, '0s')}
+                        ${getDancerSilhouetteSVG('#c084fc', 58, '0.2s')}
+                        <div class="w-16 h-16 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl text-amber-400 crown-hero mx-1">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        ${getDancerSilhouetteSVG('#fb7185', 58, '0.4s')}
+                        ${getDancerSilhouetteSVG('#f472b6', 54, '0.6s')}
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-pink-300 font-bold mt-2">Festa & Dança no Salão Real!</span>
+                `;
+                spawnDancerRainParticles(particlesLayer);
+                spawnConfettiParticles(particlesLayer, 40);
+                startFireworks(['#ec4899', '#a855f7', '#fbbf24', '#38bdf8']);
+            } else if (chosenTheme === 'ROYAL_FIREWORKS') {
+                themeBadge.innerText = 'Festival Pirotécnico';
+                stage.innerHTML = `
+                    <div class="flex items-center gap-5 text-4xl sm:text-5xl text-amber-400 crown-hero">
+                        <i class="fa-solid fa-sparkles text-sky-400 text-3xl"></i>
+                        <i class="fa-solid fa-trophy text-amber-300 text-5xl"></i>
+                        <i class="fa-solid fa-star text-pink-400 text-3xl"></i>
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-sky-300 font-bold mt-3">Os Céus Celebram Sua Vitória!</span>
+                `;
+                spawnStarRainParticles(particlesLayer);
+                startFireworks(['#38bdf8', '#fbbf24', '#34d399', '#f472b6', '#c084fc']);
+            } else if (chosenTheme === 'MASTER_COUP') {
+                themeBadge.innerText = 'Golpe de Mestre';
+                spawnSpotlights(spotlightsLayer);
+                stage.innerHTML = `
+                    <div class="w-24 h-24 rounded-full bg-rose-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl text-amber-400 crown-hero">
+                        <i class="fa-solid fa-chess-king"></i>
+                    </div>
+                    <span class="text-xs uppercase tracking-widest text-emerald-300 font-bold mt-3">Estratégia Impecável e Sem Piedade!</span>
+                `;
+                spawnCrownRainParticles(particlesLayer, 25);
+                spawnCoinRainParticles(particlesLayer);
+            }
+        }
+
+        function getDancerSilhouetteSVG(color = '#f472b6', height = 46, delay = '0s') {
+            return `
+                <svg viewBox="0 0 64 128" style="height:${height}px; animation-delay:${delay};" class="dancer-anim drop-shadow-[0_0_10px_rgba(244,114,182,0.75)]">
+                    <circle cx="32" cy="14" r="7" fill="${color}"/>
+                    <path d="M16 28 Q24 22 32 25 Q40 22 48 28" stroke="${color}" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+                    <path d="M25 25 L39 25 L35 44 L29 44 Z" fill="${color}"/>
+                    <path d="M29 44 L35 44 L33 54 L31 54 Z" fill="${color}" opacity="0.5"/>
+                    <path d="M24 54 L40 54 L44 68 L20 68 Z" fill="${color}"/>
+                    <path d="M23 68 L30 68 L25 118 L20 118 Z" fill="${color}"/>
+                    <path d="M34 68 L41 68 L47 116 L42 116 Z" fill="${color}"/>
+                </svg>
+            `;
+        }
+
+        function spawnConfettiParticles(container, count = 80) {
+            const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#a855f7', '#ef4444', '#fde047'];
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'falling-particle rounded-sm';
+                el.style.left = `${Math.random() * 100}vw`;
+                el.style.width = `${6 + Math.random() * 9}px`;
+                el.style.height = `${10 + Math.random() * 12}px`;
+                el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                el.style.animationDuration = `${2.2 + Math.random() * 2.5}s`;
+                el.style.animationDelay = `${Math.random() * 1.4}s`;
+                container.appendChild(el);
+            }
+        }
+
+        function spawnCrownRainParticles(container, count = 42) {
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'coin-3d-particle text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.9)]';
+                el.style.left = `${Math.random() * 100}vw`;
+                el.style.fontSize = `${20 + Math.random() * 18}px`;
+                el.innerHTML = '<i class="fa-solid fa-crown"></i>';
+                el.style.animationDuration = `${2.3 + Math.random() * 2.4}s`;
+                el.style.animationDelay = `${Math.random() * 1.4}s`;
+                container.appendChild(el);
+            }
+        }
+
+        function spawnDancerRainParticles(container, count = 28) {
+            const colors = ['#f472b6', '#ec4899', '#c084fc', '#fb7185', '#fbbf24'];
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'falling-particle';
+                el.style.left = `${Math.random() * 96}vw`;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const size = 44 + Math.random() * 24;
+                el.innerHTML = getDancerSilhouetteSVG(color, size, `${Math.random() * 0.5}s`);
+                el.style.animationDuration = `${2.8 + Math.random() * 2.6}s`;
+                el.style.animationDelay = `${Math.random() * 1.5}s`;
+                container.appendChild(el);
+            }
+        }
+
+        function spawnStarRainParticles(container, count = 48) {
+            const colors = ['text-amber-300', 'text-sky-400', 'text-pink-400', 'text-purple-400', 'text-emerald-300'];
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                const colorClass = colors[Math.floor(Math.random() * colors.length)];
+                el.className = `coin-3d-particle ${colorClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]`;
+                el.style.left = `${Math.random() * 100}vw`;
+                el.style.fontSize = `${16 + Math.random() * 16}px`;
+                el.innerHTML = '<i class="fa-solid fa-star"></i>';
+                el.style.animationDuration = `${2.1 + Math.random() * 2.3}s`;
+                el.style.animationDelay = `${Math.random() * 1.3}s`;
+                container.appendChild(el);
+            }
+        }
+
+        function spawnCoinRainParticles(container) {
+            for (let i = 0; i < 55; i++) {
+                const el = document.createElement('div');
+                el.className = 'coin-3d-particle text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]';
+                el.style.left = `${Math.random() * 100}vw`;
+                el.style.fontSize = `${18 + Math.random() * 16}px`;
+                el.innerHTML = '<i class="fa-solid fa-coins"></i>';
+                el.style.animationDuration = `${2 + Math.random() * 2.2}s`;
+                el.style.animationDelay = `${Math.random() * 1.3}s`;
+                container.appendChild(el);
+            }
+        }
+
+        // =========================================================
+        // BOT AI LOGIC (WITH DIFFICULTY SCALING)
+        // =========================================================
+        function pickBotTarget(bot, validTargets, profile) {
+            if (!validTargets || validTargets.length === 0) return null;
+            if (!profile.smartTarget) {
+                return validTargets[Math.floor(Math.random() * validTargets.length)];
+            }
+            const sorted = [...validTargets].sort((a, b) => {
+                const aLives = a.cards.filter(c => !c.revealed).length;
+                const bLives = b.cards.filter(c => !c.revealed).length;
+                if (aLives !== bLives) return aLives - bLives;
+                return b.coins - a.coins;
+            });
+            return sorted[0];
+        }
+
+        function botHasRole(bot, role) {
+            return bot.cards.some(c => !c.revealed && c.character === role);
+        }
+
+        function botTakeTurn(bot) {
+            if (gameState.phase !== 'ACTION_SELECTION') return;
+            if (gameState.players[gameState.turnIndex].id !== bot.id) return;
+
+            const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
+            const validTargets = gameState.players.filter(p => canTargetOpponent(bot, p));
+
+            if (bot.coins >= 10 && validTargets.length > 0) {
+                const target = pickBotTarget(bot, validTargets, profile);
+                executeAction({ type: 'COUP', sourceId: bot.id, targetId: target.id });
+                return;
+            }
+
+            if (bot.coins >= profile.coupThreshold && validTargets.length > 0 && Math.random() < (profile.smartTarget ? 0.85 : 0.6)) {
+                const target = pickBotTarget(bot, validTargets, profile);
+                executeAction({ type: 'COUP', sourceId: bot.id, targetId: target.id });
+                return;
+            }
+
+            if (matchConfig.teamsEnabled) {
+                if (gameState.asylum >= 3 && (!botHasRole(bot, 'DUKE') || Math.random() < 0.25) && Math.random() < 0.45) {
+                    executeAction({ type: 'EMBEZZLE', sourceId: bot.id });
+                    return;
+                }
+                if (bot.coins >= 1 && validTargets.length > 0 && Math.random() < 0.2) {
+                    const target = pickBotTarget(bot, validTargets, profile);
+                    executeAction({ type: 'CONVERT_OTHER', sourceId: bot.id, targetId: target.id });
+                    return;
+                }
+            }
+
+            const hasInqInDeck = gameState.deck.includes('INQUISITOR') || botHasRole(bot, 'INQUISITOR');
+            const hasAmbInDeck = gameState.deck.includes('AMBASSADOR') || botHasRole(bot, 'AMBASSADOR');
+
+            if (profile.smartTarget) {
+                if (botHasRole(bot, 'ASSASSIN') && bot.coins >= 3 && validTargets.length > 0 && Math.random() < 0.7) {
+                    const target = pickBotTarget(bot, validTargets, profile);
+                    executeAction({ type: 'ASSASSINATE', sourceId: bot.id, targetId: target.id, claimedRole: 'ASSASSIN' });
+                    return;
+                }
+                if (botHasRole(bot, 'DUKE') && Math.random() < 0.65) {
+                    executeAction({ type: 'TAX', sourceId: bot.id, claimedRole: 'DUKE' });
+                    return;
+                }
+                if (botHasRole(bot, 'CAPTAIN') && validTargets.some(t => t.coins > 0) && Math.random() < 0.65) {
+                    const target = pickBotTarget(bot, validTargets.filter(t => t.coins > 0), profile);
+                    executeAction({ type: 'STEAL', sourceId: bot.id, targetId: target.id, claimedRole: 'CAPTAIN' });
+                    return;
+                }
+                if (botHasRole(bot, 'INQUISITOR') && validTargets.length > 0 && Math.random() < 0.55) {
+                    const target = pickBotTarget(bot, validTargets, profile);
+                    executeAction({ type: 'INQUISITOR_INSPECT', sourceId: bot.id, targetId: target.id, claimedRole: 'INQUISITOR' });
+                    return;
+                }
+            }
+
+            const roll = Math.random();
+            if (roll < profile.bluffRate) {
+                const bluffChoice = Math.random();
+                if (bluffChoice < 0.4) {
+                    executeAction({ type: 'TAX', sourceId: bot.id, claimedRole: 'DUKE' });
+                } else if (bot.coins >= 3 && validTargets.length > 0 && bluffChoice < 0.65) {
+                    const target = pickBotTarget(bot, validTargets, profile);
+                    executeAction({ type: 'ASSASSINATE', sourceId: bot.id, targetId: target.id, claimedRole: 'ASSASSIN' });
+                } else if (validTargets.some(t => t.coins > 0) && bluffChoice < 0.85) {
+                    const target = pickBotTarget(bot, validTargets.filter(t => t.coins > 0), profile);
+                    executeAction({ type: 'STEAL', sourceId: bot.id, targetId: target.id, claimedRole: 'CAPTAIN' });
+                } else if (hasInqInDeck && validTargets.length > 0) {
+                    const target = pickBotTarget(bot, validTargets, profile);
+                    executeAction({ type: 'INQUISITOR_INSPECT', sourceId: bot.id, targetId: target.id, claimedRole: 'INQUISITOR' });
+                } else if (hasAmbInDeck) {
+                    executeAction({ type: 'EXCHANGE', sourceId: bot.id, claimedRole: 'AMBASSADOR' });
+                } else {
+                    executeAction({ type: 'FOREIGN_AID', sourceId: bot.id });
+                }
+            } else {
+                if (Math.random() < 0.5) {
+                    executeAction({ type: 'INCOME', sourceId: bot.id });
+                } else {
+                    executeAction({ type: 'FOREIGN_AID', sourceId: bot.id });
+                }
+            }
+        }
+
+        // =========================================================
+        // HUMAN ACTION BUTTON HANDLERS & TARGET MODAL
+        // =========================================================
+        function openTargetModal(title, desc, filterFn, callback) {
+            const modal = document.getElementById('modal-target');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            
+            const optionsContainer = document.getElementById('modal-options');
+            optionsContainer.innerHTML = '';
+
+            const validTargets = gameState.players.filter(filterFn);
+            if (validTargets.length === 0) {
+                logMessage(`⚠️ Nenhum alvo válido disponível para esta ação!`, 'text-amber-400');
+                return;
+            }
+
+            validTargets.forEach(target => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg p-3 text-left flex justify-between items-center transition';
+                const teamLabel = matchConfig.teamsEnabled && target.team
+                    ? ` • <span class="${target.team === 'CATHOLIC' ? 'text-sky-400' : 'text-rose-400'}">${target.team === 'CATHOLIC' ? 'Católico' : 'Protestante'}</span>`
+                    : '';
+                btn.innerHTML = `
+                    <span class="font-bold text-slate-100 text-sm">${target.name}${teamLabel}</span>
+                    <span class="text-amber-400 text-xs font-semibold"><i class="fa-solid fa-coins"></i> ${target.coins} moedas</span>
+                `;
+                btn.onclick = () => {
+                    modal.classList.add('hidden');
+                    callback(target.id);
+                };
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById('modal-cancel').onclick = () => modal.classList.add('hidden');
+            modal.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-income').onclick = () => executeAction({ type: 'INCOME', sourceId: getHumanPlayer().id });
+        document.getElementById('btn-foreign-aid').onclick = () => executeAction({ type: 'FOREIGN_AID', sourceId: getHumanPlayer().id });
+        document.getElementById('btn-tax').onclick = () => executeAction({ type: 'TAX', sourceId: getHumanPlayer().id, claimedRole: 'DUKE' });
+        document.getElementById('btn-exchange').onclick = () => executeAction({ type: 'EXCHANGE', sourceId: getHumanPlayer().id, claimedRole: 'AMBASSADOR' });
+        document.getElementById('btn-inquisitor-self').onclick = () => executeAction({ type: 'INQUISITOR_SELF', sourceId: getHumanPlayer().id, claimedRole: 'INQUISITOR' });
+
+        document.getElementById('btn-inquisitor-inspect').onclick = () => {
+            const human = getHumanPlayer();
+            openTargetModal("Investigar (Inquisidor)", "Escolha um oponente para olhar 1 carta dele:", p => canTargetOpponent(human, p), targetId => {
+                executeAction({ type: 'INQUISITOR_INSPECT', sourceId: human.id, targetId, claimedRole: 'INQUISITOR' });
+            });
+        };
+
+        document.getElementById('btn-assassinate').onclick = () => {
+            const human = getHumanPlayer();
+            openTargetModal("Assassinar (3 Moedas)", "Escolha a vítima do assassinato:", p => canTargetOpponent(human, p), targetId => {
+                executeAction({ type: 'ASSASSINATE', sourceId: human.id, targetId, claimedRole: 'ASSASSIN' });
+            });
+        };
+
+        document.getElementById('btn-steal').onclick = () => {
+            const human = getHumanPlayer();
+            openTargetModal("Extorquir (Capitão)", "Escolha um oponente para roubar até 2 moedas:", p => canTargetOpponent(human, p) && p.coins > 0, targetId => {
+                executeAction({ type: 'STEAL', sourceId: human.id, targetId, claimedRole: 'CAPTAIN' });
+            });
+        };
+
+        document.getElementById('btn-coup').onclick = () => {
+            const human = getHumanPlayer();
+            openTargetModal("Golpe de Estado (7 Moedas)", "Escolha quem perderá uma influência:", p => canTargetOpponent(human, p), targetId => {
+                executeAction({ type: 'COUP', sourceId: human.id, targetId });
+            });
+        };
+
+        document.getElementById('btn-convert-other').onclick = () => {
+            const human = getHumanPlayer();
+            openTargetModal("Converter Jogador (1 Moeda ao Asilo)", "Escolha outro jogador para inverter a equipe dele:", p => p.id !== human.id && p.cards.some(c => !c.revealed), targetId => {
+                executeAction({ type: 'CONVERT_OTHER', sourceId: human.id, targetId });
+            });
+        };
+
+        document.getElementById('btn-convert-self').onclick = () => {
+            executeAction({ type: 'CONVERT_SELF', sourceId: getHumanPlayer().id });
+        };
+
+        document.getElementById('btn-embezzle').onclick = () => {
+            executeAction({ type: 'EMBEZZLE', sourceId: getHumanPlayer().id });
+        };
+
+        // =========================================================
+        // ACTION EXECUTION, CHALLENGES & BLOCKS
+        // =========================================================
+        function executeAction(action) {
+            stopTurnTimer();
+            gameState.pendingAction = action;
+            const actor = gameState.players.find(p => p.id === action.sourceId);
+
+            if (action.type === 'INCOME') {
+                actor.coins += 1;
+                gameState.bank -= 1;
+                logMessage(`${actor.name} pegou 1 moeda de Renda.`, 'text-emerald-400');
+                nextTurn();
+                return;
+            }
+
+            if (action.type === 'COUP') {
+                actor.coins -= 7;
+                gameState.bank += 7;
+                const target = gameState.players.find(p => p.id === action.targetId);
+                logMessage(`💥 ${actor.name} deu um GOLPE DE ESTADO em ${target.name}!`, 'text-red-500 font-bold');
+                promptLoseInfluence(target.id, () => nextTurn());
+                return;
+            }
+
+            if (action.type === 'CONVERT_OTHER') {
+                actor.coins -= 1;
+                gameState.asylum += 1;
+                const target = gameState.players.find(p => p.id === action.targetId);
+                target.team = target.team === 'CATHOLIC' ? 'PROTESTANT' : 'CATHOLIC';
+                const newTeamLabel = target.team === 'CATHOLIC' ? 'Católico' : 'Protestante';
+                logMessage(`⛪ ${actor.name} pagou 1 moeda ao Asilo e converteu ${target.name} para ${newTeamLabel}!`, 'text-cyan-400 font-semibold');
+                nextTurn();
+                return;
+            }
+
+            if (action.type === 'CONVERT_SELF') {
+                actor.coins -= 2;
+                gameState.asylum += 2;
+                actor.team = actor.team === 'CATHOLIC' ? 'PROTESTANT' : 'CATHOLIC';
+                const newTeamLabel = actor.team === 'CATHOLIC' ? 'Católico' : 'Protestante';
+                logMessage(`⛪ ${actor.name} pagou 2 moedas ao Asilo e converteu a si mesmo para ${newTeamLabel}!`, 'text-cyan-400 font-semibold');
+                nextTurn();
+                return;
+            }
+
+            if (action.type === 'ASSASSINATE') {
+                actor.coins -= 3;
+                gameState.bank += 3;
+            }
+
+            gameState.phase = 'ACTION_REACTION_WINDOW';
+            updateUI();
+
+            const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
+            let actionDesc = '';
+            if (action.type === 'FOREIGN_AID') actionDesc = `Ajuda Externa (+2)`;
+            else if (action.type === 'TAX') actionDesc = `Taxar (+3) como Duque`;
+            else if (action.type === 'ASSASSINATE') actionDesc = `Assassinar ${target.name} como Assassino`;
+            else if (action.type === 'STEAL') actionDesc = `Extorquir ${target.name} como Capitão`;
+            else if (action.type === 'EXCHANGE') actionDesc = `Trocar cartas como Embaixador`;
+            else if (action.type === 'INQUISITOR_SELF') actionDesc = `Trocar 1 carta como Inquisidor`;
+            else if (action.type === 'INQUISITOR_INSPECT') actionDesc = `Investigar ${target.name} como Inquisidor`;
+            else if (action.type === 'EMBEZZLE') actionDesc = `Roubar o Asilo (${gameState.asylum} moedas) alegando NÃO ter o Duque`;
+
+            document.getElementById('status-message').innerText = `${actor.name} declarou: ${actionDesc}.`;
+            logMessage(`${actor.name} declarou: ${actionDesc}.`, 'text-amber-300 font-semibold');
+            if (matchConfig.mode === 'ONLINE') pushOnlineState();
+
+            promptReactionsForAction();
+        }
+
+        function canPlayerChallenge(challenger, accused) {
+            if (challenger.id === accused.id) return false;
+            if (!challenger.cards.some(c => !c.revealed)) return false;
+            if (areAlliesRestricted(challenger, accused)) return false;
+            return true;
+        }
+
+        function canPlayerBlockGeneralAction(blocker, actor) {
+            if (!blocker.cards.some(c => !c.revealed)) return false;
+            if (blocker.id === actor.id) return false;
+            if (areAlliesRestricted(blocker, actor)) return false;
+            return true;
+        }
+
+        function canPlayerProtectTarget(protector, target) {
+            if (!protector.cards.some(c => !c.revealed)) return false;
+            if (!target) return false;
+            if (protector.id === target.id) return true;
+            if (matchConfig.protectionScope === 'SELF_ONLY') return false;
+            if (matchConfig.teamsEnabled && protector.team !== target.team) return false;
+            return true;
+        }
+
+        function promptReactionsForAction() {
+            const action = gameState.pendingAction;
+            const actor = gameState.players.find(p => p.id === action.sourceId);
+            const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
+            const human = getHumanPlayer();
+
+            if (!isLocalController(actor) && human.cards.some(c => !c.revealed)) {
+                const container = document.getElementById('reaction-controls');
+                container.innerHTML = '';
+                container.classList.remove('hidden');
+                document.getElementById('action-buttons').classList.add('hidden');
+
+                let hasOptions = false;
+
+                if ((action.claimedRole || action.type === 'EMBEZZLE') && canPlayerChallenge(human, actor)) {
+                    hasOptions = true;
+                    const btnChallenge = document.createElement('button');
+                    btnChallenge.className = 'action-btn bg-red-700 hover:bg-red-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-red-500 shadow';
+                    btnChallenge.innerHTML = action.type === 'EMBEZZLE'
+                        ? `<i class="fa-solid fa-gavel mr-1"></i> Duvidar (Alegar que tem Duque!)`
+                        : `<i class="fa-solid fa-gavel mr-1"></i> Contestar ${CHARACTERS[action.claimedRole].name}!`;
+                    btnChallenge.onclick = () => handleChallenge(human.id);
+                    container.appendChild(btnChallenge);
+                }
+
+                if (action.type === 'FOREIGN_AID' && canPlayerBlockGeneralAction(human, actor)) {
+                    hasOptions = true;
+                    const btn = document.createElement('button');
+                    btn.className = 'action-btn bg-amber-700 hover:bg-amber-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-amber-500';
+                    btn.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloquear (Duque)`;
+                    btn.onclick = () => handleBlock(human.id, 'DUKE');
+                    container.appendChild(btn);
+                }
+
+                if (action.type === 'EMBEZZLE' && canPlayerBlockGeneralAction(human, actor)) {
+                    hasOptions = true;
+                    const btn = document.createElement('button');
+                    btn.className = 'action-btn bg-amber-700 hover:bg-amber-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-amber-500';
+                    btn.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloquear Asilo (Duque)`;
+                    btn.onclick = () => handleBlock(human.id, 'DUKE');
+                    container.appendChild(btn);
+                }
+
+                if (action.type === 'ASSASSINATE' && canPlayerProtectTarget(human, target)) {
+                    hasOptions = true;
+                    const label = target.id === human.id ? 'Bloquear (Condessa)' : `Salvar ${target.name} (Condessa)`;
+                    const btn = document.createElement('button');
+                    btn.className = 'action-btn bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-purple-500';
+                    btn.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> ${label}`;
+                    btn.onclick = () => handleBlock(human.id, 'CONTESSA');
+                    container.appendChild(btn);
+                }
+
+                if (action.type === 'STEAL' && canPlayerProtectTarget(human, target)) {
+                    hasOptions = true;
+                    const suffix = target.id === human.id ? '' : ` p/ ${target.name}`;
+                    const btnCapt = document.createElement('button');
+                    btnCapt.className = 'action-btn bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-sky-500';
+                    btnCapt.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloq. Capitão${suffix}`;
+                    btnCapt.onclick = () => handleBlock(human.id, 'CAPTAIN');
+                    container.appendChild(btnCapt);
+
+                    const hasAmb = matchConfig.specialRole === 'AMBASSADOR' || matchConfig.numPlayers === 10;
+                    if (hasAmb) {
+                        const btnAmb = document.createElement('button');
+                        btnAmb.className = 'action-btn bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-emerald-500';
+                        btnAmb.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloq. ${CHARACTERS.AMBASSADOR.name}${suffix}`;
+                        btnAmb.onclick = () => handleBlock(human.id, 'AMBASSADOR');
+                        container.appendChild(btnAmb);
+                    }
+                }
+
+                if (!hasOptions) {
+                    hideReactionControls();
+                    if (matchConfig.mode === 'ONLINE') {
+                        document.getElementById('status-message').innerText = `Aguardando outros jogadores reagirem a ${actor.name}...`;
+                    } else {
+                        simulateBotReactionsToAction();
+                    }
+                    return;
+                }
+
+                const btnPass = document.createElement('button');
+                btnPass.className = 'action-btn bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-500';
+                btnPass.innerText = 'Permitir / Passar';
+                btnPass.onclick = () => {
+                    hideReactionControls();
+                    if (matchConfig.mode === 'ONLINE') {
+                        recordOnlinePassAndCheckResolve();
+                    } else {
+                        simulateBotReactionsToAction();
+                    }
+                };
+                container.appendChild(btnPass);
+            } else if (matchConfig.mode === 'ONLINE') {
+                document.getElementById('status-message').innerText = `Aguardando reação dos oponentes na nuvem...`;
+            } else {
+                simulateBotReactionsToAction();
+            }
+        }
+
+        function recordOnlinePassAndCheckResolve() {
+            const action = gameState.pendingAction;
+            if (!action) return;
+            action.passedUids = action.passedUids || [];
+            if (!action.passedUids.includes(currentUserUid)) {
+                action.passedUids.push(currentUserUid);
+            }
+            const eligibleResponders = gameState.players.filter(p =>
+                p.id !== action.sourceId && p.cards.some(c => !c.revealed)
+            );
+            if (action.passedUids.length >= eligibleResponders.length) {
+                resolvePendingAction();
+            } else {
+                pushOnlineState();
+            }
+        }
+
+        function renderBlockReactionButtonsForLocal(blocker, blockRole) {
+            const human = getHumanPlayer();
+            const container = document.getElementById('reaction-controls');
+            container.innerHTML = '';
+            container.classList.remove('hidden');
+            document.getElementById('action-buttons').classList.add('hidden');
+
+            const btnChallengeBlock = document.createElement('button');
+            btnChallengeBlock.className = 'action-btn bg-red-700 hover:bg-red-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-red-500 shadow';
+            btnChallengeBlock.innerHTML = `<i class="fa-solid fa-gavel mr-1"></i> Contestar Bloqueio (${CHARACTERS[blockRole].name})!`;
+            btnChallengeBlock.onclick = () => handleChallenge(human.id);
+
+            const btnAcceptBlock = document.createElement('button');
+            btnAcceptBlock.className = 'action-btn bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-500';
+            btnAcceptBlock.innerText = 'Aceitar Bloqueio';
+            btnAcceptBlock.onclick = () => {
+                hideReactionControls();
+                logMessage(`Bloqueio de ${blocker.name} aceito.`, 'text-slate-400');
+                nextTurn();
+            };
+
+            container.appendChild(btnChallengeBlock);
+            container.appendChild(btnAcceptBlock);
+        }
+
+        function simulateBotReactionsToAction() {
+            const currentSession = matchSessionId;
+            const action = gameState.pendingAction;
+            const actor = gameState.players.find(p => p.id === action.sourceId);
+            const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
+            const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
+
+            setTimeout(() => {
+                if (matchSessionId !== currentSession) return;
+                if (gameState.phase !== 'ACTION_REACTION_WINDOW') return;
+
+                const bots = gameState.players.filter(p => !p.isHuman && p.id !== actor.id && p.cards.some(c => !c.revealed));
+
+                if (action.claimedRole || action.type === 'EMBEZZLE') {
+                    const challengers = bots.filter(b => canPlayerChallenge(b, actor));
+                    if (challengers.length > 0 && Math.random() < profile.challengeRate) {
+                        const c = challengers[Math.floor(Math.random() * challengers.length)];
+                        handleChallenge(c.id);
+                        return;
+                    }
+                }
+
+                if (action.type === 'FOREIGN_AID') {
+                    const validBlockers = bots.filter(b => canPlayerBlockGeneralAction(b, actor));
+                    if (validBlockers.length > 0) {
+                        const honestDuke = validBlockers.find(b => botHasRole(b, 'DUKE'));
+                        if (honestDuke && Math.random() < (profile.smartTarget ? 0.75 : 0.45)) {
+                            handleBlock(honestDuke.id, 'DUKE');
+                            return;
+                        }
+                        if (Math.random() < profile.blockBluffRate) {
+                            const blocker = validBlockers[Math.floor(Math.random() * validBlockers.length)];
+                            handleBlock(blocker.id, 'DUKE');
+                            return;
+                        }
+                    }
+                }
+
+                if (action.type === 'EMBEZZLE') {
+                    const blockers = bots.filter(b => canPlayerBlockGeneralAction(b, actor));
+                    if (blockers.length > 0 && Math.random() < Math.max(0.35, profile.blockBluffRate)) {
+                        const honestDuke = blockers.find(b => botHasRole(b, 'DUKE'));
+                        const blocker = honestDuke || blockers[Math.floor(Math.random() * blockers.length)];
+                        handleBlock(blocker.id, 'DUKE');
+                        return;
+                    }
+                }
+
+                if (action.type === 'ASSASSINATE' && target) {
+                    const protectors = bots.filter(b => canPlayerProtectTarget(b, target));
+                    if (protectors.length > 0) {
+                        const honestContessa = protectors.find(b => botHasRole(b, 'CONTESSA'));
+                        if (honestContessa && Math.random() < 0.85) {
+                            handleBlock(honestContessa.id, 'CONTESSA');
+                            return;
+                        }
+                        if (Math.random() < profile.blockBluffRate) {
+                            const blocker = protectors[Math.floor(Math.random() * protectors.length)];
+                            handleBlock(blocker.id, 'CONTESSA');
+                            return;
+                        }
+                    }
+                }
+
+                if (action.type === 'STEAL' && target) {
+                    const protectors = bots.filter(b => canPlayerProtectTarget(b, target));
+                    if (protectors.length > 0) {
+                        const honestProtector = protectors.find(b => botHasRole(b, 'CAPTAIN') || botHasRole(b, 'AMBASSADOR'));
+                        if (honestProtector && Math.random() < 0.80) {
+                            const role = botHasRole(honestProtector, 'CAPTAIN') ? 'CAPTAIN' : 'AMBASSADOR';
+                            handleBlock(honestProtector.id, role);
+                            return;
+                        }
+                        if (Math.random() < profile.blockBluffRate) {
+                            const blocker = protectors[Math.floor(Math.random() * protectors.length)];
+                            handleBlock(blocker.id, 'CAPTAIN');
+                            return;
+                        }
+                    }
+                }
+
+                resolvePendingAction();
+            }, 900);
+        }
+
+        function handleBlock(blockerId, blockRole) {
+            hideReactionControls();
+            const blocker = gameState.players.find(p => p.id === blockerId);
+            gameState.pendingAction.blockerId = blockerId;
+            gameState.pendingAction.blockRole = blockRole;
+            gameState.phase = 'BLOCK_REACTION_WINDOW';
+
+            logMessage(`🛡️ ${blocker.name} BLOQUEOU alegando **${CHARACTERS[blockRole].name}**!`, 'text-purple-400 font-bold');
+            document.getElementById('status-message').innerText = `${blocker.name} bloqueou com ${CHARACTERS[blockRole].name}. Contestar bloqueio?`;
+            if (matchConfig.mode === 'ONLINE') pushOnlineState();
+
+            const human = getHumanPlayer();
+            if (!isLocalController(blocker) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
+                renderBlockReactionButtonsForLocal(blocker, blockRole);
+            } else if (matchConfig.mode === 'ONLINE') {
+                document.getElementById('status-message').innerText = `Aguardando resposta ao bloqueio de ${blocker.name}...`;
+            } else {
+                const currentSession = matchSessionId;
+                const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
+                setTimeout(() => {
+                    if (matchSessionId !== currentSession) return;
+                    if (gameState.phase !== 'BLOCK_REACTION_WINDOW') return;
+                    const bots = gameState.players.filter(p => !p.isHuman && canPlayerChallenge(p, blocker));
+                    if (bots.length > 0 && Math.random() < profile.challengeRate) {
+                        const c = bots[Math.floor(Math.random() * bots.length)];
+                        handleChallenge(c.id);
+                    } else {
+                        logMessage(`A ação foi bloqueada com sucesso por ${blocker.name}.`, 'text-slate-400');
+                        nextTurn();
+                    }
+                }, 900);
+            }
+        }
+
+        function handleChallenge(challengerId) {
+            hideReactionControls();
+            const action = gameState.pendingAction;
+            const challenger = gameState.players.find(p => p.id === challengerId);
+            const isBlockWindow = gameState.phase === 'BLOCK_REACTION_WINDOW';
+
+            if (!isBlockWindow && action.type === 'EMBEZZLE') {
+                const accused = gameState.players.find(p => p.id === action.sourceId);
+                logMessage(`⚔️ ${challenger.name} DUVIDOU que ${accused.name} NÃO tenha o Duque!`, 'text-red-400 font-bold');
+
+                const dukeIndex = accused.cards.findIndex(c => !c.revealed && c.character === 'DUKE');
+                if (dukeIndex !== -1) {
+                    logMessage(`❌ PEGO NO FLAGRA! ${accused.name} TINHA o Duque e não podia roubar o Asilo!`, 'text-rose-500 font-bold');
+                    promptLoseInfluence(accused.id, () => nextTurn());
+                } else {
+                    logMessage(`✅ VERDADE! ${accused.name} realmente não tinha o Duque!`, 'text-emerald-400 font-bold');
+                    promptLoseInfluence(challenger.id, () => resolvePendingAction());
+                }
+                return;
+            }
+
+            const claimedRole = isBlockWindow ? action.blockRole : action.claimedRole;
+            const accusedId = isBlockWindow ? action.blockerId : action.sourceId;
+            const accused = gameState.players.find(p => p.id === accusedId);
+
+            logMessage(`⚔️ ${challenger.name} CONTESTOU ${accused.name} (${CHARACTERS[claimedRole].name})!`, 'text-red-400 font-bold');
+
+            const cardIndex = accused.cards.findIndex(c => !c.revealed && c.character === claimedRole);
+
+            if (cardIndex !== -1) {
+                logMessage(`✅ PROVA DE VERDADE! ${accused.name} revelou ${CHARACTERS[claimedRole].name} e trocou por uma nova do baralho!`, 'text-emerald-400 font-bold');
+                const card = accused.cards[cardIndex];
+                gameState.deck.push(card.character);
+                gameState.deck.sort(() => Math.random() - 0.5);
+                card.character = gameState.deck.pop();
+                updateUI();
+
+                promptLoseInfluence(challenger.id, () => {
+                    if (isBlockWindow) {
+                        logMessage(`Bloqueio mantido! Ação cancelada.`, 'text-slate-400');
+                        nextTurn();
+                    } else {
+                        resolvePendingAction();
+                    }
+                });
+            } else {
+                logMessage(`❌ BLEFE DESMASCARADO! ${accused.name} não possuía ${CHARACTERS[claimedRole].name}!`, 'text-rose-500 font-bold');
+                promptLoseInfluence(accused.id, () => {
+                    if (isBlockWindow) {
+                        resolvePendingAction();
+                    } else {
+                        nextTurn();
+                    }
+                });
+            }
+        }
+
+        // =========================================================
+        // RESOLVE ACTION EFFECTS (INCLUDING INQUISITOR ABILITIES)
+        // =========================================================
+        function resolvePendingAction() {
+            const action = gameState.pendingAction;
+            if (!action) return;
+
+            const actor = gameState.players.find(p => p.id === action.sourceId);
+
+            if (action.type === 'FOREIGN_AID') {
+                actor.coins += 2;
+                gameState.bank -= 2;
+                logMessage(`${actor.name} recebeu 2 moedas de Ajuda Externa.`, 'text-emerald-400');
+                nextTurn();
+            } else if (action.type === 'TAX') {
+                actor.coins += 3;
+                gameState.bank -= 3;
+                logMessage(`${actor.name} coletou 3 moedas de Taxas (Duque).`, 'text-amber-400');
+                nextTurn();
+            } else if (action.type === 'EMBEZZLE') {
+                const stolenAsylum = gameState.asylum;
+                actor.coins += stolenAsylum;
+                gameState.asylum = 0;
+                logMessage(`💰 ${actor.name} desviou ${stolenAsylum} moedas do Asilo!`, 'text-amber-300 font-bold');
+                nextTurn();
+            } else if (action.type === 'STEAL') {
+                const target = gameState.players.find(p => p.id === action.targetId);
+                const stolen = Math.min(2, target.coins);
+                target.coins -= stolen;
+                actor.coins += stolen;
+                triggerStealAnimation(actor, target, stolen);
+                logMessage(`${actor.name} extorquiu ${stolen} moedas de ${target.name}!`, 'text-sky-400');
+                nextTurn();
+            } else if (action.type === 'ASSASSINATE') {
+                const target = gameState.players.find(p => p.id === action.targetId);
+                logMessage(`🗡️ ${actor.name} executou o assassinato contra ${target.name}!`, 'text-rose-400 font-bold');
+                promptLoseInfluence(target.id, () => nextTurn());
+            } else if (action.type === 'EXCHANGE') {
+                if (isLocalController(actor)) {
+                    startSelfExchange(actor, 2, 'Troca do Embaixador');
+                } else {
+                    botPerformSelfExchange(actor, 2);
+                    logMessage(`${actor.name} trocou cartas com o baralho (Embaixador).`, 'text-emerald-400');
+                    nextTurn();
+                }
+            } else if (action.type === 'INQUISITOR_SELF') {
+                if (isLocalController(actor)) {
+                    startSelfExchange(actor, 1, 'Inquisidor: Trocar 1 Carta');
+                } else {
+                    botPerformSelfExchange(actor, 1);
+                    logMessage(`${actor.name} analisou 1 carta do baralho (Inquisidor).`, 'text-violet-400');
+                    nextTurn();
+                }
+            } else if (action.type === 'INQUISITOR_INSPECT') {
+                const target = gameState.players.find(p => p.id === action.targetId);
+                startInquisitorInspect(actor, target);
+            }
+        }
+
+        function startSelfExchange(player, drawCount, title) {
+            const drawn = [];
+            for (let i = 0; i < drawCount && gameState.deck.length > 0; i++) {
+                drawn.push(gameState.deck.pop());
+            }
+
+            const activeCards = player.cards.filter(c => !c.revealed).map(c => c.character);
+            const revealedCards = player.cards.filter(c => c.revealed);
+            const pool = [...activeCards, ...drawn];
+            const keepCount = activeCards.length;
+
+            const modal = document.getElementById('modal-exchange');
+            document.getElementById('exchange-modal-title').innerText = title;
+            document.getElementById('exchange-max-count').innerText = keepCount;
+            const container = document.getElementById('exchange-cards-container');
+            const confirmBtn = document.getElementById('btn-confirm-exchange');
+            const countEl = document.getElementById('exchange-selected-count');
+
+            container.innerHTML = '';
+            countEl.innerText = '0';
+            confirmBtn.disabled = true;
+            let selected = [];
+
+            pool.forEach((charKey, idx) => {
+                const char = CHARACTERS[charKey];
+                const el = document.createElement('div');
+                el.className = 'w-24 h-36 rounded-xl border-2 border-slate-700 bg-slate-800 flex flex-col justify-between items-center p-2.5 cursor-pointer transition';
+                el.innerHTML = `
+                    <span class="text-[9px] uppercase font-bold text-slate-400">Carta</span>
+                    <i class="fa-solid ${char.icon} text-2xl text-purple-400"></i>
+                    <span class="text-xs font-bold text-slate-100">${char.name}</span>
+                `;
+                el.onclick = () => {
+                    if (selected.includes(idx)) {
+                        selected = selected.filter(i => i !== idx);
+                        el.className = 'w-24 h-36 rounded-xl border-2 border-slate-700 bg-slate-800 flex flex-col justify-between items-center p-2.5 cursor-pointer transition';
+                    } else if (selected.length < keepCount) {
+                        selected.push(idx);
+                        el.className = 'w-24 h-36 rounded-xl border-2 border-amber-400 ring-2 ring-amber-400/50 bg-amber-950/40 flex flex-col justify-between items-center p-2.5 cursor-pointer transition';
+                    }
+                    countEl.innerText = selected.length;
+                    confirmBtn.disabled = selected.length !== keepCount;
+                };
+                container.appendChild(el);
+            });
+
+            confirmBtn.onclick = () => {
+                const kept = selected.map(i => ({ character: pool[i], revealed: false }));
+                player.cards = [...kept, ...revealedCards];
+                pool.forEach((charKey, idx) => {
+                    if (!selected.includes(idx)) gameState.deck.push(charKey);
+                });
+                gameState.deck.sort(() => Math.random() - 0.5);
+                modal.classList.add('hidden');
+                logMessage(`Você concluiu a troca de cartas com o baralho.`, 'text-emerald-400');
+                updateUI();
+                nextTurn();
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        function botPerformSelfExchange(bot, drawCount) {
+            const drawn = [];
+            for (let i = 0; i < drawCount && gameState.deck.length > 0; i++) {
+                drawn.push(gameState.deck.pop());
+            }
+            const active = bot.cards.filter(c => !c.revealed).map(c => c.character);
+            const revealed = bot.cards.filter(c => c.revealed);
+            const pool = [...active, ...drawn].sort(() => Math.random() - 0.5);
+            const kept = pool.slice(0, active.length).map(c => ({ character: c, revealed: false }));
+            const returned = pool.slice(active.length);
+            bot.cards = [...kept, ...revealed];
+            gameState.deck.push(...returned);
+            gameState.deck.sort(() => Math.random() - 0.5);
+        }
+
+        function startInquisitorInspect(inquisitor, target) {
+            const targetActiveIndices = target.cards
+                .map((c, idx) => (!c.revealed ? idx : -1))
+                .filter(idx => idx !== -1);
+
+            if (targetActiveIndices.length === 0) {
+                nextTurn();
+                return;
+            }
+
+            if (isLocalController(inquisitor)) {
+                const modal = document.getElementById('modal-inspect');
+                const display = document.getElementById('inspect-card-display');
+                const desc = document.getElementById('inspect-desc');
+                const subhint = document.getElementById('inspect-subhint');
+                const decisionBtns = document.getElementById('inspect-decision-buttons');
+
+                const revealChosenCard = (cardIdx) => {
+                    const inspectedCard = target.cards[cardIdx];
+                    const char = CHARACTERS[inspectedCard.character];
+                    desc.innerHTML = `Você examinou a ${cardIdx === 0 ? '1ª' : '2ª'} carta de <strong class="text-amber-300">${target.name}</strong>:`;
+                    subhint.innerText = 'Decida se o oponente mantém esta carta ou se será forçado a trocá-la:';
+                    display.innerHTML = `
+                        <div class="w-28 h-40 rounded-xl border-2 ${char.color} shadow-xl flex flex-col justify-between items-center p-3">
+                            <span class="text-[9px] uppercase font-bold opacity-80">Carta Revelada</span>
+                            <i class="fa-solid ${char.icon} text-3xl"></i>
+                            <span class="text-sm font-bold">${char.name}</span>
+                        </div>
+                    `;
+                    decisionBtns.classList.remove('hidden');
+
+                    document.getElementById('btn-inspect-keep').onclick = () => {
+                        modal.classList.add('hidden');
+                        logMessage(`🔍 Você investigou ${target.name} e permitiu que ele mantivesse a carta.`, 'text-violet-400');
+                        nextTurn();
+                    };
+
+                    document.getElementById('btn-inspect-swap').onclick = () => {
+                        modal.classList.add('hidden');
+                        gameState.deck.push(inspectedCard.character);
+                        gameState.deck.sort(() => Math.random() - 0.5);
+                        inspectedCard.character = gameState.deck.pop();
+                        logMessage(`🔍 Você investigou ${target.name} e o FORÇOU a trocar a carta pelo baralho!`, 'text-violet-400 font-semibold');
+                        updateUI();
+                        nextTurn();
+                    };
+                };
+
+                if (targetActiveIndices.length === 1) {
+                    revealChosenCard(targetActiveIndices[0]);
+                } else {
+                    desc.innerHTML = `<strong class="text-amber-300">${target.name}</strong> possui 2 cartas ocultas. Escolha qual deseja inspecionar:`;
+                    subhint.innerText = 'Clique em uma das cartas abaixo para vê-la em segredo.';
+                    decisionBtns.classList.add('hidden');
+                    display.innerHTML = '';
+
+                    targetActiveIndices.forEach((cardIdx, pos) => {
+                        const cardBtn = document.createElement('button');
+                        cardBtn.className = 'w-28 h-40 rounded-xl border-2 border-violet-500/70 bg-gradient-to-b from-slate-800 to-slate-950 hover:border-amber-400 hover:scale-105 transition shadow-xl flex flex-col justify-between items-center p-3 cursor-pointer';
+                        cardBtn.innerHTML = `
+                            <span class="text-[9px] uppercase font-bold text-violet-300">Carta ${pos + 1}</span>
+                            <i class="fa-solid fa-eye text-3xl text-amber-400"></i>
+                            <span class="text-xs font-bold text-slate-200">Inspecionar</span>
+                        `;
+                        cardBtn.onclick = () => revealChosenCard(cardIdx);
+                        display.appendChild(cardBtn);
+                    });
+                }
+
+                modal.classList.remove('hidden');
+            } else {
+                const chosenCardIdx = targetActiveIndices[Math.floor(Math.random() * targetActiveIndices.length)];
+                const inspectedCard = target.cards[chosenCardIdx];
+                const forceSwap = Math.random() < 0.6;
+                if (forceSwap && gameState.deck.length > 0) {
+                    gameState.deck.push(inspectedCard.character);
+                    gameState.deck.sort(() => Math.random() - 0.5);
+                    inspectedCard.character = gameState.deck.pop();
+                    logMessage(`🔍 ${inquisitor.name} investigou ${target.name} e o forçou a trocar a carta!`, 'text-violet-400 font-semibold');
+                } else {
+                    logMessage(`🔍 ${inquisitor.name} investigou ${target.name} e devolveu a carta.`, 'text-violet-400');
+                }
+                updateUI();
+                nextTurn();
+            }
+        }
+
+        // =========================================================
+        // INFLUENCE LOSS HANDLER
+        // =========================================================
+        function promptLoseInfluence(playerId, callback) {
+            const player = gameState.players.find(p => p.id === playerId);
+            const activeCards = player.cards.filter(c => !c.revealed);
+
+            if (activeCards.length === 0) {
+                if (callback) callback();
+                return;
+            }
+
+            if (activeCards.length === 1) {
+                activeCards[0].revealed = true;
+                triggerDeathAnimation(player, true);
+                logMessage(`💀 ${player.name} perdeu sua última influência (${CHARACTERS[activeCards[0].character].name}) e foi eliminado!`, 'text-rose-500 font-bold');
+                updateUI();
+                if (callback) callback();
+                return;
+            }
+
+            if (isLocalController(player)) {
+                const modal = document.getElementById('modal-lose-influence');
+                const container = document.getElementById('lose-cards-container');
+                container.innerHTML = '';
+
+                player.cards.forEach(card => {
+                    if (!card.revealed) {
+                        const char = CHARACTERS[card.character];
+                        const btn = document.createElement('button');
+                        btn.className = `w-24 h-36 rounded-xl border-2 ${char.color} flex flex-col justify-between items-center p-2.5 hover:scale-105 transition shadow-lg`;
+                        btn.innerHTML = `
+                            <span class="text-[9px] uppercase font-bold text-slate-300">Descartar</span>
+                            <i class="fa-solid ${char.icon} text-3xl"></i>
+                            <span class="text-xs font-bold">${char.name}</span>
+                        `;
+                        btn.onclick = () => {
+                            card.revealed = true;
+                            modal.classList.add('hidden');
+                            const remaining = player.cards.filter(c => !c.revealed).length;
+                            triggerDeathAnimation(player, remaining === 0);
+                            logMessage(`💀 ${player.name} revelou e perdeu ${char.name}.`, 'text-rose-500 font-semibold');
+                            updateUI();
+                            if (callback) callback();
+                        };
+                        container.appendChild(btn);
+                    }
+                });
+                modal.classList.remove('hidden');
+            } else if (matchConfig.mode === 'ONLINE') {
+                const wasBlock = gameState.phase === 'BLOCK_REACTION_WINDOW';
+                gameState.phase = 'LOSE_INFLUENCE_WINDOW';
+                gameState.pendingLosePlayerId = player.id;
+                gameState.pendingAfterLose = wasBlock ? 'RESOLVE_ACTION' : 'NEXT_TURN';
+                pushOnlineState();
+            } else {
+                const cardToLose = activeCards[Math.floor(Math.random() * activeCards.length)];
+                cardToLose.revealed = true;
+                const remaining = player.cards.filter(c => !c.revealed).length;
+                triggerDeathAnimation(player, remaining === 0);
+                logMessage(`💀 ${player.name} perdeu a influência de ${CHARACTERS[cardToLose.character].name}.`, 'text-rose-500 font-semibold');
+                updateUI();
+                if (callback) callback();
+            }
+        }
+    </script>
+</body>
+</html>
