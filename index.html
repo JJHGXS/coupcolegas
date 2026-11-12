@@ -6,6 +6,8 @@
     <title>COUPLEGAS — Intriga, Diplomacia e Estratégia na Corte</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS para Rede Global P2P em Hospedagem Estática -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -218,8 +220,42 @@
                         <input type="text" id="online-player-name" maxlength="16" placeholder="Ex: Lorde Arthur" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-2 text-sm text-white outline-none">
                     </div>
                     <div class="text-right text-[11px] text-slate-400">
-                        <div>Status da Nuvem: <span id="cloud-status-badge" class="text-amber-400 font-bold">Conectando...</span></div>
+                        <div>Status da Rede: <span id="cloud-status-badge" class="text-amber-400 font-bold">Conectando...</span></div>
                         <div class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="online-uid-display">---</span></div>
+                    </div>
+                </div>
+
+                <!-- Criar ou Entrar por Código -->
+                <div id="online-join-create-box" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-indigo-500/30 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-cinzel font-bold text-amber-400 text-sm mb-1"><i class="fa-solid fa-plus-circle mr-1"></i> Criar Nova Sala</h3>
+                            <p class="text-xs text-slate-400">Gere um código exclusivo de sala na rede global e compartilhe com seus amigos para entrarem.</p>
+                        </div>
+                        <button id="btn-online-create-room" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
+                            Criar Sala Global
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-cinzel font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-right-to-bracket mr-1"></i> Entrar com Código</h3>
+                            <input type="text" id="online-room-code-input" maxlength="8" placeholder="Ex: A7K9P2" class="w-full mt-1 bg-slate-900 border border-slate-700 focus:border-emerald-400 rounded-lg px-3 py-2 text-sm uppercase font-mono tracking-widest text-white outline-none">
+                        </div>
+                        <button id="btn-online-join-room" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-lg transition">
+                            Conectar na Sala
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de Salas Disponíveis na Rede Local -->
+                <div id="online-public-rooms-box" class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300"><i class="fa-solid fa-satellite-dish text-emerald-400 mr-1.5"></i> Salas Detectadas na Mesma Rede / Navegador</span>
+                        <span class="text-[10px] text-slate-500">Para amigos distantes, envie o Código acima</span>
+                    </div>
+                    <div id="online-rooms-list" class="max-h-36 overflow-y-auto space-y-1.5 text-xs">
+                        <div class="text-slate-500 italic py-2 text-center">Nenhuma sala local detectada. Crie uma acima ou insira o código do anfitrião!</div>
                     </div>
                 </div>
 
@@ -673,12 +709,12 @@
         import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================
-        // CLOUD MULTIPLAYER SETUP (STATIC HOSTING READY)
+        // MULTIPLAYER ENGINE (FIREBASE CLOUD + PEERJS GLOBAL P2P)
         // =========================================================
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'couplegas-static-v1';
         let db = null;
         let auth = null;
-        let currentUserUid = null;
+        let currentUserUid = 'user_' + Math.random().toString(36).substring(2, 10);
         let onlineRoomCode = null;
         let isOnlineHost = false;
         let roomUnsubscribe = null;
@@ -686,31 +722,104 @@
         let isApplyingRemoteState = false;
         let lastSyncedVersion = -1;
 
+        // PeerJS Global P2P (Funciona em qualquer hospedagem estática sem servidor próprio)
+        let networkTransport = 'P2P'; // 'FIREBASE' ou 'P2P'
+        let peerInstance = null;
+        let hostConnections = []; // Usado pelo Host para enviar estado aos convidados
+        let clientConnection = null; // Usado pelo Convidado para falar com o Host
+        let p2pRoomData = null;
+        let localChannel = null;
+        let discoveredLocalRooms = {};
+        let hostHeartbeatInterval = null;
+
         async function initCloudServices() {
+            document.getElementById('online-uid-display').innerText = currentUserUid;
+            initLocalDiscoveryChannel();
+
             try {
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    updateCloudStatus('Modo Local / Offline', 'text-amber-400');
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    currentUserUid = auth.currentUser?.uid || currentUserUid;
+                    document.getElementById('online-uid-display').innerText = currentUserUid;
+                    networkTransport = 'FIREBASE';
+                    updateCloudStatus('Nuvem Firebase Conectada', 'text-emerald-400');
+                    listenToPublicRooms();
                     return;
                 }
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                currentUserUid = auth.currentUser?.uid || ('user_' + Math.random().toString(36).substring(2, 10));
-                document.getElementById('online-uid-display').innerText = currentUserUid;
-                updateCloudStatus('Conectado na Nuvem', 'text-emerald-400');
-                listenToPublicRooms();
             } catch (err) {
-                console.error('Erro ao conectar serviço em nuvem:', err);
-                updateCloudStatus('Falha na Conexão', 'text-rose-400');
+                console.warn('Fallback para Rede Global P2P ativado:', err);
             }
+
+            // Modo Estático Universal: Rede Global P2P via WebRTC (PeerJS)
+            networkTransport = 'P2P';
+            if (typeof window.Peer !== 'undefined') {
+                updateCloudStatus('Rede Global P2P Pronta', 'text-emerald-400');
+            } else {
+                updateCloudStatus('Falha ao carregar P2P', 'text-rose-400');
+            }
+        }
+
+        function initLocalDiscoveryChannel() {
+            if (typeof BroadcastChannel === 'undefined') return;
+            localChannel = new BroadcastChannel('couplegas_local_rooms_v1');
+            localChannel.onmessage = (ev) => {
+                const msg = ev.data;
+                if (!msg || !msg.type) return;
+                if (msg.type === 'ROOM_ANNOUNCE' && msg.room) {
+                    discoveredLocalRooms[msg.room.code] = { ...msg.room, lastSeen: Date.now() };
+                    renderLocalDiscoveredRooms();
+                } else if (msg.type === 'ROOM_CLOSED' && msg.code) {
+                    delete discoveredLocalRooms[msg.code];
+                    renderLocalDiscoveredRooms();
+                }
+            };
+            setInterval(() => {
+                const now = Date.now();
+                let changed = false;
+                Object.keys(discoveredLocalRooms).forEach(code => {
+                    if (now - discoveredLocalRooms[code].lastSeen > 5000) {
+                        delete discoveredLocalRooms[code];
+                        changed = true;
+                    }
+                });
+                if (changed) renderLocalDiscoveredRooms();
+            }, 3000);
+        }
+
+        function renderLocalDiscoveredRooms() {
+            if (networkTransport === 'FIREBASE') return;
+            const listEl = document.getElementById('online-rooms-list');
+            if (!listEl) return;
+            const rooms = Object.values(discoveredLocalRooms).filter(r => r.status === 'WAITING');
+            if (rooms.length === 0) {
+                listEl.innerHTML = `<div class="text-slate-500 italic py-2 text-center">Nenhuma sala local detectada. Crie uma acima ou insira o código do anfitrião!</div>`;
+                return;
+            }
+            listEl.innerHTML = '';
+            rooms.forEach(room => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2';
+                row.innerHTML = `
+                    <div>
+                        <span class="font-mono font-bold text-amber-400">${room.code}</span>
+                        <span class="text-slate-300 ml-2">Host: <strong>${room.hostName}</strong></span>
+                        <span class="text-slate-400 ml-2">(${room.count}/10)</span>
+                    </div>
+                    <button class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded text-[11px]">Entrar</button>
+                `;
+                row.querySelector('button').onclick = () => joinOnlineRoom(room.code);
+                listEl.appendChild(row);
+            });
         }
 
         function updateCloudStatus(text, colorClass) {
@@ -778,15 +887,84 @@
             });
         }
 
-        async function createOnlineRoom() {
-            if (!db || !currentUserUid) {
-                alertBox('Serviço em nuvem indisponível neste ambiente. Verifique a configuração do projeto.');
-                return;
+        function showWaitingRoomUI(code) {
+            document.getElementById('online-join-create-box').classList.add('hidden');
+            document.getElementById('online-public-rooms-box').classList.add('hidden');
+            document.getElementById('online-waiting-room').classList.remove('hidden');
+            document.getElementById('waiting-room-code').innerText = code;
+        }
+
+        function handleIncomingRoomSnapshot(data) {
+            if (!data) return;
+            isOnlineHost = (data.hostUid === currentUserUid);
+
+            if (data.status === 'WAITING') {
+                document.getElementById('game-screen').classList.add('hidden');
+                document.getElementById('lobby-screen').classList.remove('hidden');
+                document.getElementById('lobby-step-online').classList.remove('hidden');
+                document.getElementById('lobby-step-config').classList.add('hidden');
+
+                const members = data.members || [];
+                document.getElementById('waiting-players-count').innerText = members.length;
+                const listEl = document.getElementById('waiting-players-list');
+                listEl.innerHTML = '';
+                members.forEach(m => {
+                    const isHostBadge = m.uid === data.hostUid ? ' <i class="fa-solid fa-crown text-amber-400 ml-1"></i>' : '';
+                    const isMe = m.uid === currentUserUid ? 'border-amber-400 bg-amber-950/30' : 'border-slate-700 bg-slate-900';
+                    const card = document.createElement('div');
+                    card.className = `px-3 py-2 rounded-lg border ${isMe} text-xs font-semibold text-slate-200 truncate`;
+                    card.innerHTML = `${m.name}${isHostBadge}`;
+                    listEl.appendChild(card);
+                });
+
+                document.getElementById('waiting-host-controls').classList.toggle('hidden', !isOnlineHost);
+                document.getElementById('waiting-guest-notice').classList.toggle('hidden', isOnlineHost);
+                document.getElementById('btn-online-start-match').disabled = members.length < 2;
+                if (data.config) {
+                    Object.assign(matchConfig, data.config);
+                    matchConfig.mode = 'ONLINE';
+                }
+            } else if (data.status === 'PLAYING' && data.gameStateJson) {
+                const incomingVersion = data.stateVersion || 0;
+                if (incomingVersion <= lastSyncedVersion && !document.getElementById('game-screen').classList.contains('hidden')) {
+                    return;
+                }
+                lastSyncedVersion = incomingVersion;
+
+                isApplyingRemoteState = true;
+                try {
+                    if (data.config) {
+                        Object.assign(matchConfig, data.config);
+                        matchConfig.mode = 'ONLINE';
+                    }
+                    const parsedState = JSON.parse(data.gameStateJson);
+                    gameState = parsedState;
+
+                    document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('game-screen').classList.remove('hidden');
+                    syncOnlineHudAndLogs(data.logs || []);
+                    updateUI();
+                    handleOnlinePostSyncUI();
+                } finally {
+                    isApplyingRemoteState = false;
+                }
             }
+        }
+
+        function broadcastP2PRoomState() {
+            if (!isOnlineHost || !p2pRoomData) return;
+            hostConnections = hostConnections.filter(c => c.open);
+            hostConnections.forEach(conn => {
+                try {
+                    conn.send({ type: 'ROOM_STATE', data: p2pRoomData });
+                } catch (e) {}
+            });
+            handleIncomingRoomSnapshot(p2pRoomData);
+        }
+
+        async function createOnlineRoom() {
             const code = generateRoomCode();
             const myName = getPlayerNickname();
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
-
             const initialRoomData = {
                 code,
                 hostUid: currentUserUid,
@@ -799,74 +977,205 @@
                 logs: []
             };
 
-            try {
-                await setDoc(roomRef, initialRoomData);
+            if (networkTransport === 'FIREBASE' && db) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
+                try {
+                    await setDoc(roomRef, initialRoomData);
+                    onlineRoomCode = code;
+                    isOnlineHost = true;
+                    lastSyncedVersion = 0;
+                    subscribeToRoom(code);
+                } catch (err) {
+                    console.error('Erro ao criar sala:', err);
+                    alertBox('Não foi possível criar a sala.');
+                }
+                return;
+            }
+
+            // Criação via Rede Global P2P (PeerJS)
+            if (typeof window.Peer === 'undefined') {
+                alertBox('Biblioteca de rede P2P indisponível no momento.');
+                return;
+            }
+
+            updateCloudStatus('Criando sala na rede...', 'text-amber-400');
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+            }
+
+            const peerId = `couplegas-room-${code}`;
+            peerInstance = new window.Peer(peerId);
+
+            peerInstance.on('open', () => {
                 onlineRoomCode = code;
                 isOnlineHost = true;
                 lastSyncedVersion = 0;
-                subscribeToRoom(code);
-            } catch (err) {
-                console.error('Erro ao criar sala:', err);
-                alertBox('Não foi possível criar a sala na nuvem.');
-            }
+                p2pRoomData = initialRoomData;
+                hostConnections = [];
+                updateCloudStatus('Sala Global Ativa', 'text-emerald-400');
+                showWaitingRoomUI(code);
+                handleIncomingRoomSnapshot(p2pRoomData);
+
+                if (hostHeartbeatInterval) clearInterval(hostHeartbeatInterval);
+                hostHeartbeatInterval = setInterval(() => {
+                    if (localChannel && p2pRoomData) {
+                        localChannel.postMessage({
+                            type: 'ROOM_ANNOUNCE',
+                            room: {
+                                code: p2pRoomData.code,
+                                hostName: p2pRoomData.hostName,
+                                status: p2pRoomData.status,
+                                count: p2pRoomData.members.length
+                            }
+                        });
+                    }
+                }, 1500);
+            });
+
+            peerInstance.on('connection', (conn) => {
+                hostConnections.push(conn);
+                conn.on('data', (msg) => {
+                    if (!msg || !msg.type || !p2pRoomData) return;
+                    if (msg.type === 'JOIN_REQUEST') {
+                        if (p2pRoomData.status !== 'WAITING') {
+                            conn.send({ type: 'ERROR', message: 'Esta partida já está em andamento!' });
+                            return;
+                        }
+                        if (p2pRoomData.members.length >= 10 && !p2pRoomData.members.some(m => m.uid === msg.uid)) {
+                            conn.send({ type: 'ERROR', message: 'A sala já atingiu o limite máximo de 10 jogadores.' });
+                            return;
+                        }
+                        const idx = p2pRoomData.members.findIndex(m => m.uid === msg.uid);
+                        if (idx === -1) {
+                            p2pRoomData.members.push({ uid: msg.uid, name: msg.name });
+                        } else {
+                            p2pRoomData.members[idx].name = msg.name;
+                        }
+                        broadcastP2PRoomState();
+                    } else if (msg.type === 'CLIENT_STATE_UPDATE' && msg.payload) {
+                        Object.assign(p2pRoomData, msg.payload);
+                        broadcastP2PRoomState();
+                    } else if (msg.type === 'LEAVE_ROOM' && msg.uid) {
+                        p2pRoomData.members = p2pRoomData.members.filter(m => m.uid !== msg.uid);
+                        broadcastP2PRoomState();
+                    }
+                });
+                conn.on('close', () => {
+                    hostConnections = hostConnections.filter(c => c !== conn);
+                });
+            });
+
+            peerInstance.on('error', (err) => {
+                console.error('Erro P2P Host:', err);
+                alertBox('Erro ao abrir sala na rede P2P. Tente novamente.');
+            });
         }
 
         async function joinOnlineRoom(codeInput) {
-            if (!db || !currentUserUid) {
-                alertBox('Serviço em nuvem indisponível neste ambiente.');
-                return;
-            }
             const code = (codeInput || '').trim().toUpperCase();
             if (!code) {
                 alertBox('Digite o código da sala para entrar.');
                 return;
             }
 
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
-            try {
-                const snap = await getDoc(roomRef);
-                if (!snap.exists()) {
-                    alertBox(`Sala "${code}" não encontrada.`);
-                    return;
-                }
-                const data = snap.data();
-                if (data.status !== 'WAITING') {
-                    alertBox('Esta partida já está em andamento!');
-                    return;
-                }
-                const members = Array.isArray(data.members) ? [...data.members] : [];
-                if (members.length >= 10 && !members.some(m => m.uid === currentUserUid)) {
-                    alertBox('A sala já atingiu o limite máximo de 10 jogadores.');
-                    return;
-                }
+            if (networkTransport === 'FIREBASE' && db) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
+                try {
+                    const snap = await getDoc(roomRef);
+                    if (!snap.exists()) {
+                        alertBox(`Sala "${code}" não encontrada.`);
+                        return;
+                    }
+                    const data = snap.data();
+                    if (data.status !== 'WAITING') {
+                        alertBox('Esta partida já está em andamento!');
+                        return;
+                    }
+                    const members = Array.isArray(data.members) ? [...data.members] : [];
+                    if (members.length >= 10 && !members.some(m => m.uid === currentUserUid)) {
+                        alertBox('A sala já atingiu o limite máximo de 10 jogadores.');
+                        return;
+                    }
 
-                const myName = getPlayerNickname();
-                const existingIdx = members.findIndex(m => m.uid === currentUserUid);
-                if (existingIdx === -1) {
-                    members.push({ uid: currentUserUid, name: myName });
-                } else {
-                    members[existingIdx].name = myName;
-                }
+                    const myName = getPlayerNickname();
+                    const existingIdx = members.findIndex(m => m.uid === currentUserUid);
+                    if (existingIdx === -1) {
+                        members.push({ uid: currentUserUid, name: myName });
+                    } else {
+                        members[existingIdx].name = myName;
+                    }
 
-                await updateDoc(roomRef, { members });
-                onlineRoomCode = code;
-                isOnlineHost = (data.hostUid === currentUserUid);
-                lastSyncedVersion = data.stateVersion || 0;
-                subscribeToRoom(code);
-            } catch (err) {
-                console.error('Erro ao entrar na sala:', err);
-                alertBox('Erro ao conectar na sala.');
+                    await updateDoc(roomRef, { members });
+                    onlineRoomCode = code;
+                    isOnlineHost = (data.hostUid === currentUserUid);
+                    lastSyncedVersion = data.stateVersion || 0;
+                    subscribeToRoom(code);
+                } catch (err) {
+                    console.error('Erro ao entrar na sala:', err);
+                    alertBox('Erro ao conectar na sala.');
+                }
+                return;
             }
+
+            // Conexão via Rede Global P2P (PeerJS)
+            if (typeof window.Peer === 'undefined') {
+                alertBox('Biblioteca de rede P2P indisponível no momento.');
+                return;
+            }
+
+            updateCloudStatus(`Conectando à sala ${code}...`, 'text-amber-400');
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+            }
+
+            peerInstance = new window.Peer();
+            peerInstance.on('open', () => {
+                const targetPeerId = `couplegas-room-${code}`;
+                const conn = peerInstance.connect(targetPeerId, { reliable: true });
+                clientConnection = conn;
+
+                conn.on('open', () => {
+                    onlineRoomCode = code;
+                    isOnlineHost = false;
+                    updateCloudStatus('Conectado ao Anfitrião', 'text-emerald-400');
+                    showWaitingRoomUI(code);
+                    conn.send({
+                        type: 'JOIN_REQUEST',
+                        uid: currentUserUid,
+                        name: getPlayerNickname()
+                    });
+                });
+
+                conn.on('data', (msg) => {
+                    if (!msg || !msg.type) return;
+                    if (msg.type === 'ROOM_STATE' && msg.data) {
+                        p2pRoomData = msg.data;
+                        handleIncomingRoomSnapshot(p2pRoomData);
+                    } else if (msg.type === 'ERROR') {
+                        alertBox(msg.message || 'Erro na sala.');
+                        leaveOnlineRoomLocal();
+                    }
+                });
+
+                conn.on('close', () => {
+                    if (onlineRoomCode === code) {
+                        leaveOnlineRoomLocal();
+                        alertBox('A conexão com a sala foi encerrada pelo anfitrião.');
+                    }
+                });
+            });
+
+            peerInstance.on('error', (err) => {
+                console.error('Erro P2P Cliente:', err);
+                updateCloudStatus('Rede Global P2P Pronta', 'text-emerald-400');
+                alertBox(`Não foi possível encontrar a sala "${code}". Verifique o código com o anfitrião.`);
+            });
         }
 
         function subscribeToRoom(code) {
             if (roomUnsubscribe) roomUnsubscribe();
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
-
-            document.getElementById('online-join-create-box').classList.add('hidden');
-            document.getElementById('online-public-rooms-box').classList.add('hidden');
-            document.getElementById('online-waiting-room').classList.remove('hidden');
-            document.getElementById('waiting-room-code').innerText = code;
+            showWaitingRoomUI(code);
 
             roomUnsubscribe = onSnapshot(roomRef, (snap) => {
                 if (!snap.exists()) {
@@ -874,70 +1183,15 @@
                     alertBox('A sala foi encerrada pelo anfitrião.');
                     return;
                 }
-
-                const data = snap.data();
-                isOnlineHost = (data.hostUid === currentUserUid);
-
-                if (data.status === 'WAITING') {
-                    document.getElementById('game-screen').classList.add('hidden');
-                    document.getElementById('lobby-screen').classList.remove('hidden');
-                    document.getElementById('lobby-step-online').classList.remove('hidden');
-                    document.getElementById('lobby-step-config').classList.add('hidden');
-
-                    const members = data.members || [];
-                    document.getElementById('waiting-players-count').innerText = members.length;
-                    const listEl = document.getElementById('waiting-players-list');
-                    listEl.innerHTML = '';
-                    members.forEach(m => {
-                        const isHostBadge = m.uid === data.hostUid ? ' <i class="fa-solid fa-crown text-amber-400 ml-1"></i>' : '';
-                        const isMe = m.uid === currentUserUid ? 'border-amber-400 bg-amber-950/30' : 'border-slate-700 bg-slate-900';
-                        const card = document.createElement('div');
-                        card.className = `px-3 py-2 rounded-lg border ${isMe} text-xs font-semibold text-slate-200 truncate`;
-                        card.innerHTML = `${m.name}${isHostBadge}`;
-                        listEl.appendChild(card);
-                    });
-
-                    document.getElementById('waiting-host-controls').classList.toggle('hidden', !isOnlineHost);
-                    document.getElementById('waiting-guest-notice').classList.toggle('hidden', isOnlineHost);
-                    document.getElementById('btn-online-start-match').disabled = members.length < 2;
-                    if (data.config) {
-                        Object.assign(matchConfig, data.config);
-                        matchConfig.mode = 'ONLINE';
-                    }
-                } else if (data.status === 'PLAYING' && data.gameStateJson) {
-                    const incomingVersion = data.stateVersion || 0;
-                    if (incomingVersion <= lastSyncedVersion && !document.getElementById('game-screen').classList.contains('hidden')) {
-                        return;
-                    }
-                    lastSyncedVersion = incomingVersion;
-
-                    isApplyingRemoteState = true;
-                    try {
-                        if (data.config) {
-                            Object.assign(matchConfig, data.config);
-                            matchConfig.mode = 'ONLINE';
-                        }
-                        const parsedState = JSON.parse(data.gameStateJson);
-                        gameState = parsedState;
-
-                        document.getElementById('lobby-screen').classList.add('hidden');
-                        document.getElementById('game-screen').classList.remove('hidden');
-                        syncOnlineHudAndLogs(data.logs || []);
-                        updateUI();
-                        handleOnlinePostSyncUI();
-                    } finally {
-                        isApplyingRemoteState = false;
-                    }
-                }
+                handleIncomingRoomSnapshot(snap.data());
             }, (err) => {
                 console.error('Erro na sincronização da sala:', err);
             });
         }
 
         async function pushOnlineState(newLogEntry = null, newLogClass = 'text-slate-300') {
-            if (matchConfig.mode !== 'ONLINE' || !onlineRoomCode || !db || isApplyingRemoteState) return;
+            if (matchConfig.mode !== 'ONLINE' || !onlineRoomCode || isApplyingRemoteState) return;
 
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
             lastSyncedVersion += 1;
 
             const payload = {
@@ -952,105 +1206,23 @@
                 window._onlineLogsBuffer.push({ msg: newLogEntry, cls: newLogClass });
                 if (window._onlineLogsBuffer.length > 60) window._onlineLogsBuffer.shift();
                 payload.logs = window._onlineLogsBuffer;
+            } else if (window._onlineLogsBuffer) {
+                payload.logs = window._onlineLogsBuffer;
             }
 
-            try {
-                await updateDoc(roomRef, payload);
-            } catch (err) {
-                console.error('Erro ao enviar jogada para nuvem:', err);
-            }
-        }
-
-        function syncOnlineHudAndLogs(logs) {
-            window._onlineLogsBuffer = logs;
-            const logContainer = document.getElementById('game-log');
-            logContainer.innerHTML = '';
-            logs.forEach(item => {
-                const entry = document.createElement('div');
-                entry.className = item.cls || 'text-slate-300';
-                entry.innerHTML = `> ${item.msg}`;
-                logContainer.appendChild(entry);
-            });
-            logContainer.scrollTop = logContainer.scrollHeight;
-
-            const n = gameState.players.length;
-            document.getElementById('hud-mode-badge').innerText =
-                `Online (${onlineRoomCode}) • ${n} Jogadores${matchConfig.teamsEnabled ? ' • Equipes' : ''}`;
-
-            document.getElementById('asylum-center-box').classList.toggle('hidden', !matchConfig.teamsEnabled);
-            document.getElementById('btn-convert-other').classList.toggle('hidden', !matchConfig.teamsEnabled);
-            document.getElementById('btn-convert-self').classList.toggle('hidden', !matchConfig.teamsEnabled);
-            document.getElementById('btn-embezzle').classList.toggle('hidden', !matchConfig.teamsEnabled);
-
-            const hasAmb = matchConfig.specialRole === 'AMBASSADOR' || n === 10;
-            const hasInq = matchConfig.specialRole === 'INQUISITOR' || n === 10;
-            document.getElementById('btn-exchange').classList.toggle('hidden', !hasAmb);
-            document.getElementById('btn-inquisitor-self').classList.toggle('hidden', !hasInq);
-            document.getElementById('btn-inquisitor-inspect').classList.toggle('hidden', !hasInq);
-            document.getElementById('btn-restart-match').classList.toggle('hidden', !isOnlineHost);
-        }
-
-        function handleOnlinePostSyncUI() {
-            hideReactionControls();
-            document.getElementById('action-buttons').classList.remove('hidden');
-
-            const alivePlayers = gameState.players.filter(p => p.cards.some(c => !c.revealed));
-            if (alivePlayers.length === 1 || gameState.phase === 'GAME_OVER') {
-                const winner = alivePlayers[0];
-                if (winner) {
-                    lastWinnerName = winner.name;
-                    document.getElementById('turn-indicator').innerText = 'FIM DE PARTIDA!';
-                    document.getElementById('status-message').innerText = `🏆 Vitória de ${winner.name}!`;
-                    triggerVictoryAnimation(winner);
+            if (networkTransport === 'FIREBASE' && db) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+                try {
+                    await updateDoc(roomRef, payload);
+                } catch (err) {
+                    console.error('Erro ao enviar jogada para nuvem:', err);
                 }
-                return;
-            }
-
-            const current = gameState.players[gameState.turnIndex];
-            const me = getHumanPlayer();
-            if (!current || !me) return;
-
-            document.getElementById('turn-indicator').innerText = `Vez de: ${current.name}`;
-
-            if (gameState.phase === 'ACTION_SELECTION') {
-                if (current.uid === currentUserUid) {
-                    document.getElementById('status-message').innerText = current.coins >= 10
-                        ? 'Você tem 10+ moedas! É obrigatório dar um Golpe de Estado.'
-                        : 'Sua vez! Escolha uma ação.';
-                    startTurnTimer();
-                } else {
-                    stopTurnTimer();
-                    document.getElementById('status-message').innerText = `Aguardando jogada de ${current.name}...`;
-                }
-            } else if (gameState.phase === 'ACTION_REACTION_WINDOW') {
-                stopTurnTimer();
-                const action = gameState.pendingAction;
-                const actor = gameState.players.find(p => p.id === action.sourceId);
-                document.getElementById('status-message').innerText = `${actor.name} declarou uma ação. Reaja ou aguarde!`;
-                if (actor.uid !== currentUserUid && me.cards.some(c => !c.revealed)) {
-                    promptReactionsForAction();
-                }
-            } else if (gameState.phase === 'BLOCK_REACTION_WINDOW') {
-                stopTurnTimer();
-                const action = gameState.pendingAction;
-                const blocker = gameState.players.find(p => p.id === action.blockerId);
-                document.getElementById('status-message').innerText = `${blocker.name} bloqueou com ${CHARACTERS[action.blockRole].name}. Contestar?`;
-                if (blocker.uid !== currentUserUid && me.cards.some(c => !c.revealed) && canPlayerChallenge(me, blocker)) {
-                    renderBlockReactionButtonsForLocal(blocker, action.blockRole);
-                }
-            } else if (gameState.phase === 'LOSE_INFLUENCE_WINDOW' && gameState.pendingLosePlayerId !== undefined) {
-                stopTurnTimer();
-                const targetPlayer = gameState.players.find(p => p.id === gameState.pendingLosePlayerId);
-                if (targetPlayer && targetPlayer.uid === currentUserUid) {
-                    promptLoseInfluence(targetPlayer.id, () => {
-                        const after = gameState.pendingAfterLose || 'NEXT_TURN';
-                        gameState.pendingLosePlayerId = undefined;
-                        gameState.pendingAfterLose = undefined;
-                        if (after === 'RESOLVE_ACTION') resolvePendingAction();
-                        else nextTurn();
-                    });
-                } else if (targetPlayer) {
-                    document.getElementById('status-message').innerText = `Aguardando ${targetPlayer.name} escolher qual carta perder...`;
+            } else if (networkTransport === 'P2P') {
+                if (isOnlineHost && p2pRoomData) {
+                    Object.assign(p2pRoomData, payload);
+                    broadcastP2PRoomState();
+                } else if (clientConnection && clientConnection.open) {
+                    clientConnection.send({ type: 'CLIENT_STATE_UPDATE', payload });
                 }
             }
         }
@@ -1060,16 +1232,31 @@
                 roomUnsubscribe();
                 roomUnsubscribe = null;
             }
+            if (hostHeartbeatInterval) {
+                clearInterval(hostHeartbeatInterval);
+                hostHeartbeatInterval = null;
+            }
+            if (localChannel && onlineRoomCode && isOnlineHost) {
+                localChannel.postMessage({ type: 'ROOM_CLOSED', code: onlineRoomCode });
+            }
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+                peerInstance = null;
+            }
+            hostConnections = [];
+            clientConnection = null;
+            p2pRoomData = null;
             onlineRoomCode = null;
             isOnlineHost = false;
             window._onlineLogsBuffer = [];
+            updateCloudStatus(networkTransport === 'FIREBASE' ? 'Nuvem Firebase Conectada' : 'Rede Global P2P Pronta', 'text-emerald-400');
             document.getElementById('online-waiting-room').classList.add('hidden');
             document.getElementById('online-join-create-box').classList.remove('hidden');
             document.getElementById('online-public-rooms-box').classList.remove('hidden');
         }
 
         async function leaveOnlineRoom() {
-            if (db && onlineRoomCode && currentUserUid) {
+            if (networkTransport === 'FIREBASE' && db && onlineRoomCode && currentUserUid) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                 try {
                     const snap = await getDoc(roomRef);
@@ -1085,6 +1272,10 @@
                 } catch (e) {
                     console.error(e);
                 }
+            } else if (networkTransport === 'P2P' && !isOnlineHost && clientConnection && clientConnection.open) {
+                try {
+                    clientConnection.send({ type: 'LEAVE_ROOM', uid: currentUserUid });
+                } catch (e) {}
             }
             leaveOnlineRoomLocal();
         }
@@ -1392,9 +1583,12 @@
 
         document.getElementById('btn-launch-game').onclick = async () => {
             if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
-                if (db && isOnlineHost) {
+                if (networkTransport === 'FIREBASE' && db && isOnlineHost) {
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                     await updateDoc(roomRef, { config: { ...matchConfig } });
+                } else if (networkTransport === 'P2P' && isOnlineHost && p2pRoomData) {
+                    p2pRoomData.config = { ...matchConfig };
+                    broadcastP2PRoomState();
                 }
                 document.getElementById('lobby-step-config').classList.add('hidden');
                 document.getElementById('lobby-step-online').classList.remove('hidden');
@@ -1442,10 +1636,15 @@
             }
 
             let rawPlayers = [];
-            if (matchConfig.mode === 'ONLINE' && onlineRoomCode && db) {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
-                const snap = await getDoc(roomRef);
-                const members = snap.exists() ? (snap.data().members || []) : [];
+            if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
+                let members = [];
+                if (networkTransport === 'FIREBASE' && db) {
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
+                    const snap = await getDoc(roomRef);
+                    members = snap.exists() ? (snap.data().members || []) : [];
+                } else if (networkTransport === 'P2P' && p2pRoomData) {
+                    members = p2pRoomData.members || [];
+                }
                 rawPlayers = members.map(m => ({
                     uid: m.uid,
                     name: m.name,
