@@ -223,19 +223,21 @@
                         <div>Status da Rede: <span id="cloud-status-badge" class="text-amber-400 font-bold">Conectando...</span></div>
                         <div class="text-[10px] font-mono text-slate-500 mt-0.5">ID: <span id="online-uid-display">---</span></div>
                         <button id="btn-toggle-firebase-setup" type="button" class="mt-1 text-[10px] text-indigo-400 hover:text-indigo-300 underline">
-                            <i class="fa-solid fa-database mr-1"></i> Configurar Nuvem Firebase (Opcional)
+                            <i class="fa-solid fa-cloud mr-1"></i> Configurar Nuvem (Supabase / Firebase)
                         </button>
                     </div>
                 </div>
 
-                <!-- Painel Opcional de Configuração Firebase Próprio -->
-                <div id="firebase-custom-setup-box" class="hidden bg-slate-950/90 p-4 rounded-xl border border-indigo-500/40 space-y-2.5 text-xs">
+                <!-- Painel de Configuração Nuvem (Supabase ou Firebase) -->
+                <div id="firebase-custom-setup-box" class="hidden bg-slate-950/90 p-4 rounded-xl border border-indigo-500/40 space-y-3 text-xs">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-indigo-300"><i class="fa-solid fa-cloud mr-1"></i> Conectar Projeto Firebase Gratuito</span>
+                        <span class="font-bold text-indigo-300"><i class="fa-solid fa-database mr-1"></i> Conectar Banco de Dados em Nuvem Gratuito</span>
                         <button id="btn-close-firebase-setup" type="button" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
                     </div>
-                    <p class="text-[11px] text-slate-400">Cole o JSON de configuração do seu Firebase Web App (com Firestore e Auth Anônima ativados). Ele ficará salvo no seu navegador.</p>
-                    <textarea id="firebase-custom-json-input" rows="3" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}' class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 font-mono text-[11px] text-slate-200 outline-none focus:border-indigo-400"></textarea>
+                    <p class="text-[11px] text-slate-400">
+                        Para hospedagem estática funcionar em qualquer PC/celular sem servidor próprio, cole as credenciais gratuitas do <strong>Firebase</strong> (JSON com Firestore + Auth Anônima) <strong>OU</strong> do <strong>Supabase</strong> (URL + Anon Key com tabela <code>couplegas_rooms</code>).
+                    </p>
+                    <textarea id="firebase-custom-json-input" rows="3" placeholder='Firebase: {"apiKey":"...","authDomain":"...","projectId":"..."}  OU  Supabase: {"supabaseUrl":"https://xxx.supabase.co","supabaseKey":"eyJ..."}' class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 font-mono text-[11px] text-slate-200 outline-none focus:border-indigo-400"></textarea>
                     <div class="flex justify-end gap-2">
                         <button id="btn-clear-firebase-custom" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold">Remover</button>
                         <button id="btn-save-firebase-custom" type="button" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Salvar & Conectar Nuvem</button>
@@ -692,11 +694,13 @@
         import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================
-        // MULTIPLAYER ENGINE (FIREBASE CLOUD + PEERJS GLOBAL P2P)
+        // MULTIPLAYER ENGINE (FIREBASE + SUPABASE + PEERJS P2P)
         // =========================================================
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'couplegas-static-v1';
         let db = null;
         let auth = null;
+        let supabaseClient = null;
+        let supabasePollInterval = null;
         let currentUserUid = 'user_' + Math.random().toString(36).substring(2, 10);
         let onlineRoomCode = null;
         let isOnlineHost = false;
@@ -705,11 +709,11 @@
         let isApplyingRemoteState = false;
         let lastSyncedVersion = -1;
 
-        // PeerJS Global P2P (Funciona em qualquer hospedagem estática sem servidor próprio)
-        let networkTransport = 'P2P'; // 'FIREBASE' ou 'P2P'
+        // PeerJS Global P2P (Fallback quando nenhum banco em nuvem está configurado)
+        let networkTransport = 'P2P'; // 'FIREBASE', 'SUPABASE' ou 'P2P'
         let peerInstance = null;
-        let hostConnections = []; // Usado pelo Host para enviar estado aos convidados
-        let clientConnection = null; // Usado pelo Convidado para falar com o Host
+        let hostConnections = [];
+        let clientConnection = null;
         let p2pRoomData = null;
         let localChannel = null;
         let discoveredLocalRooms = {};
@@ -731,8 +735,31 @@
                     : savedCustomCfg;
 
                 if (rawConfig) {
-                    const firebaseConfig = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
-                    const app = initializeApp(firebaseConfig, 'couplegas-cloud-' + Date.now());
+                    const parsedCfg = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+
+                    // Suporte 1: Supabase REST Cloud
+                    if (parsedCfg.supabaseUrl && parsedCfg.supabaseKey) {
+                        supabaseClient = {
+                            url: parsedCfg.supabaseUrl.replace(/\/$/, ''),
+                            key: parsedCfg.supabaseKey
+                        };
+                        const testRes = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?select=code&limit=1`, {
+                            headers: {
+                                'apikey': supabaseClient.key,
+                                'Authorization': `Bearer ${supabaseClient.key}`
+                            }
+                        });
+                        if (!testRes.ok) {
+                            throw new Error('Tabela couplegas_rooms não encontrada ou chave Supabase inválida.');
+                        }
+                        networkTransport = 'SUPABASE';
+                        updateCloudStatus('Nuvem Supabase Conectada', 'text-emerald-400');
+                        startSupabaseLobbyPolling();
+                        return;
+                    }
+
+                    // Suporte 2: Firebase Firestore Cloud
+                    const app = initializeApp(parsedCfg, 'couplegas-cloud-' + Date.now());
                     db = getFirestore(app);
                     auth = getAuth(app);
 
@@ -750,66 +777,80 @@
                     return;
                 }
             } catch (err) {
-                console.warn('Erro ao conectar Firebase, usando Rede Global P2P:', err);
+                console.warn('Erro ao conectar Nuvem:', err);
                 if (savedCustomCfg) {
-                    alertBox('Erro nas credenciais do Firebase salvas. Verifique se o Firestore e Login Anônimo estão ativos.');
+                    alertBox('Erro ao conectar na nuvem configurada: ' + (err.message || 'Verifique as credenciais.'));
                 }
             }
 
-            // Modo Estático Universal: Rede Global P2P via WebRTC (PeerJS)
+            // Modo Estático P2P (Fallback)
             networkTransport = 'P2P';
             if (typeof window.Peer !== 'undefined') {
-                updateCloudStatus('Rede Global P2P Pronta', 'text-emerald-400');
+                updateCloudStatus('Modo P2P (Configure Nuvem acima p/ Global)', 'text-amber-400');
             } else {
-                updateCloudStatus('Falha ao carregar P2P', 'text-rose-400');
+                updateCloudStatus('Configure Nuvem acima para jogar Online', 'text-rose-400');
             }
         }
 
-        function initLocalDiscoveryChannel() {
-            if (typeof BroadcastChannel === 'undefined') return;
-            localChannel = new BroadcastChannel('couplegas_local_rooms_v1');
-            localChannel.onmessage = (ev) => {
-                const msg = ev.data;
-                if (!msg || !msg.type) return;
-                if (msg.type === 'ROOM_ANNOUNCE' && msg.room) {
-                    discoveredLocalRooms[msg.room.code] = { ...msg.room, lastSeen: Date.now() };
-                    renderLocalDiscoveredRooms();
-                } else if (msg.type === 'ROOM_CLOSED' && msg.code) {
-                    delete discoveredLocalRooms[msg.code];
-                    renderLocalDiscoveredRooms();
-                }
+        function supabaseHeaders(extra = {}) {
+            return {
+                'apikey': supabaseClient.key,
+                'Authorization': `Bearer ${supabaseClient.key}`,
+                'Content-Type': 'application/json',
+                ...extra
             };
-            setInterval(() => {
-                const now = Date.now();
-                let changed = false;
-                Object.keys(discoveredLocalRooms).forEach(code => {
-                    if (now - discoveredLocalRooms[code].lastSeen > 5000) {
-                        delete discoveredLocalRooms[code];
-                        changed = true;
-                    }
-                });
-                if (changed) renderLocalDiscoveredRooms();
-            }, 3000);
         }
 
-        function renderLocalDiscoveredRooms() {
-            if (networkTransport === 'FIREBASE') return;
+        function startSupabaseLobbyPolling() {
+            if (supabasePollInterval) clearInterval(supabasePollInterval);
+            const poll = async () => {
+                if (networkTransport !== 'SUPABASE' || !supabaseClient) return;
+                try {
+                    if (!onlineRoomCode) {
+                        const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?status=eq.WAITING&select=*`, {
+                            headers: supabaseHeaders()
+                        });
+                        if (res.ok) {
+                            const rooms = await res.json();
+                            renderSupabaseRoomsList(rooms);
+                        }
+                    } else {
+                        const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}&select=*`, {
+                            headers: supabaseHeaders()
+                        });
+                        if (res.ok) {
+                            const rows = await res.json();
+                            if (!rows || rows.length === 0) {
+                                leaveOnlineRoomLocal();
+                                alertBox('A sala foi encerrada pelo anfitrião.');
+                            } else {
+                                handleIncomingRoomSnapshot(rows[0]);
+                            }
+                        }
+                    }
+                } catch (e) {}
+            };
+            poll();
+            supabasePollInterval = setInterval(poll, 1400);
+        }
+
+        function renderSupabaseRoomsList(rooms) {
             const listEl = document.getElementById('online-rooms-list');
             if (!listEl) return;
-            const rooms = Object.values(discoveredLocalRooms).filter(r => r.status === 'WAITING');
-            if (rooms.length === 0) {
-                listEl.innerHTML = `<div class="text-slate-500 italic py-2 text-center">Nenhuma sala local detectada. Crie uma acima ou insira o código do anfitrião!</div>`;
+            const valid = (rooms || []).filter(r => Array.isArray(r.members) && r.members.length > 0);
+            if (valid.length === 0) {
+                listEl.innerHTML = `<div class="text-slate-500 italic py-2 text-center">Nenhuma sala aberta na nuvem no momento. Crie uma acima!</div>`;
                 return;
             }
             listEl.innerHTML = '';
-            rooms.forEach(room => {
+            valid.forEach(room => {
                 const row = document.createElement('div');
                 row.className = 'flex items-center justify-between bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2';
                 row.innerHTML = `
                     <div>
                         <span class="font-mono font-bold text-amber-400">${room.code}</span>
                         <span class="text-slate-300 ml-2">Host: <strong>${room.hostName}</strong></span>
-                        <span class="text-slate-400 ml-2">(${room.count}/10)</span>
+                        <span class="text-slate-400 ml-2">(${room.members.length}/10)</span>
                     </div>
                     <button class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded text-[11px]">Entrar</button>
                 `;
@@ -1050,6 +1091,26 @@
                 logs: []
             };
 
+            if (networkTransport === 'SUPABASE' && supabaseClient) {
+                try {
+                    const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms`, {
+                        method: 'POST',
+                        headers: supabaseHeaders({ 'Prefer': 'return=representation' }),
+                        body: JSON.stringify(initialRoomData)
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    onlineRoomCode = code;
+                    isOnlineHost = true;
+                    lastSyncedVersion = 0;
+                    showWaitingRoomUI(code);
+                    handleIncomingRoomSnapshot(initialRoomData);
+                } catch (err) {
+                    console.error('Erro Supabase create:', err);
+                    alertBox('Erro ao criar sala no Supabase. Verifique as permissões RLS da tabela couplegas_rooms.');
+                }
+                return;
+            }
+
             if (networkTransport === 'FIREBASE' && db) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
                 try {
@@ -1059,8 +1120,8 @@
                     lastSyncedVersion = 0;
                     subscribeToRoom(code);
                 } catch (err) {
-                    console.error('Erro ao criar sala:', err);
-                    alertBox('Não foi possível criar a sala.');
+                    console.error('Erro Firebase create:', err);
+                    alertBox('Erro ao criar sala no Firebase. Verifique as regras do Firestore.');
                 }
                 return;
             }
@@ -1090,8 +1151,8 @@
 
             const openTimeout = setTimeout(() => {
                 if (!opened) {
-                    updateCloudStatus('Servidor P2P lento — tente Firebase acima', 'text-rose-400');
-                    alertBox('O servidor P2P público demorou para responder. Você pode tentar novamente ou colar uma chave gratuita do Firebase em "Configurar Nuvem Firebase".');
+                    updateCloudStatus('Servidor P2P lento — tente Nuvem acima', 'text-rose-400');
+                    alertBox('O servidor P2P público demorou para responder. Tente novamente ou configure Supabase/Firebase acima.');
                 }
             }, 7000);
 
@@ -1160,7 +1221,7 @@
                 clearTimeout(openTimeout);
                 console.error('Erro P2P Host:', err);
                 updateCloudStatus('Erro na Rede P2P', 'text-rose-400');
-                alertBox(`Erro P2P (${err.type || 'rede'}): Tente novamente ou use "Configurar Nuvem Firebase" acima.`);
+                alertBox(`Erro P2P (${err.type || 'rede'}): Tente novamente ou configure Nuvem acima.`);
             });
         }
 
@@ -1171,12 +1232,55 @@
                 return;
             }
 
+            if (networkTransport === 'SUPABASE' && supabaseClient) {
+                try {
+                    const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${code}&select=*`, {
+                        headers: supabaseHeaders()
+                    });
+                    const rows = res.ok ? await res.json() : [];
+                    if (!rows || rows.length === 0) {
+                        alertBox(`Sala "${code}" não encontrada na nuvem.`);
+                        return;
+                    }
+                    const data = rows[0];
+                    if (data.status !== 'WAITING') {
+                        alertBox('Esta partida já está em andamento!');
+                        return;
+                    }
+                    const members = Array.isArray(data.members) ? [...data.members] : [];
+                    if (members.length >= 10 && !members.some(m => m.uid === currentUserUid)) {
+                        alertBox('A sala já atingiu o limite máximo de 10 jogadores.');
+                        return;
+                    }
+                    const myName = getPlayerNickname();
+                    const existingIdx = members.findIndex(m => m.uid === currentUserUid);
+                    if (existingIdx === -1) members.push({ uid: currentUserUid, name: myName });
+                    else members[existingIdx].name = myName;
+
+                    await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${code}`, {
+                        method: 'PATCH',
+                        headers: supabaseHeaders(),
+                        body: JSON.stringify({ members })
+                    });
+
+                    onlineRoomCode = code;
+                    isOnlineHost = (data.hostUid === currentUserUid);
+                    lastSyncedVersion = data.stateVersion || 0;
+                    showWaitingRoomUI(code);
+                    handleIncomingRoomSnapshot({ ...data, members });
+                } catch (err) {
+                    console.error('Erro Supabase join:', err);
+                    alertBox('Erro ao entrar na sala via Supabase.');
+                }
+                return;
+            }
+
             if (networkTransport === 'FIREBASE' && db) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
                 try {
                     const snap = await getDoc(roomRef);
                     if (!snap.exists()) {
-                        alertBox(`Sala "${code}" não encontrada.`);
+                        alertBox(`Sala "${code}" não encontrada no Firebase.`);
                         return;
                     }
                     const data = snap.data();
@@ -1189,14 +1293,10 @@
                         alertBox('A sala já atingiu o limite máximo de 10 jogadores.');
                         return;
                     }
-
                     const myName = getPlayerNickname();
                     const existingIdx = members.findIndex(m => m.uid === currentUserUid);
-                    if (existingIdx === -1) {
-                        members.push({ uid: currentUserUid, name: myName });
-                    } else {
-                        members[existingIdx].name = myName;
-                    }
+                    if (existingIdx === -1) members.push({ uid: currentUserUid, name: myName });
+                    else members[existingIdx].name = myName;
 
                     await updateDoc(roomRef, { members });
                     onlineRoomCode = code;
@@ -1204,18 +1304,23 @@
                     lastSyncedVersion = data.stateVersion || 0;
                     subscribeToRoom(code);
                 } catch (err) {
-                    console.error('Erro ao entrar na sala:', err);
-                    alertBox('Erro ao conectar na sala.');
+                    console.error('Erro Firebase join:', err);
+                    alertBox('Erro ao entrar na sala via Firebase.');
                 }
                 return;
             }
 
-            // Conexão via Rede Global P2P (PeerJS)
             if (typeof window.Peer === 'undefined') {
-                alertBox('Biblioteca de rede P2P indisponível no momento.');
+                alertBox('Configure uma nuvem (Supabase/Firebase) ou verifique sua conexão P2P.');
                 return;
             }
-            peerInstance = new window.Peer({
+
+            updateCloudStatus(`Conectando à sala ${code}...`, 'text-amber-400');
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+            }
+
+            peerInstance = new window.Peer(undefined, {
                 debug: 1,
                 config: {
                     iceServers: [
@@ -1224,54 +1329,50 @@
                     ]
                 }
             });
+
             peerInstance.on('open', () => {
-                const targetPeerId = `couplegas-room-${code}`;
-                const conn = peerInstance.connect(targetPeerId, { reliable: true });
+                const conn = peerInstance.connect(`couplegas-room-${code}`, { reliable: true });
                 clientConnection = conn;
 
                 conn.on('open', () => {
                     onlineRoomCode = code;
                     isOnlineHost = false;
-                    updateCloudStatus('Conectado ao Anfitrião', 'text-emerald-400');
+                    lastSyncedVersion = -1;
+                    updateCloudStatus('Conectado via P2P', 'text-emerald-400');
                     showWaitingRoomUI(code);
-                    conn.send({
-                        type: 'JOIN_REQUEST',
-                        uid: currentUserUid,
-                        name: getPlayerNickname()
-                    });
+                    conn.send({ type: 'JOIN_REQUEST', uid: currentUserUid, name: getPlayerNickname() });
                 });
 
                 conn.on('data', (msg) => {
-                    if (!msg || !msg.type) return;
-                    if (msg.type === 'ROOM_STATE' && msg.data) {
-                        p2pRoomData = msg.data;
-                        handleIncomingRoomSnapshot(p2pRoomData);
-                    } else if (msg.type === 'ERROR') {
+                    if (!msg) return;
+                    if (msg.type === 'ERROR') {
                         alertBox(msg.message || 'Erro na sala.');
                         leaveOnlineRoomLocal();
+                    } else if (msg.type === 'ROOM_STATE' && msg.data) {
+                        handleIncomingRoomSnapshot(msg.data);
                     }
                 });
 
                 conn.on('close', () => {
                     if (onlineRoomCode === code) {
                         leaveOnlineRoomLocal();
-                        alertBox('A conexão com a sala foi encerrada pelo anfitrião.');
+                        alertBox('Conexão com o anfitrião da sala foi encerrada.');
                     }
                 });
             });
 
             peerInstance.on('error', (err) => {
-                console.error('Erro P2P Cliente:', err);
-                updateCloudStatus('Rede Global P2P Pronta', 'text-emerald-400');
-                alertBox(`Não foi possível encontrar a sala "${code}". Verifique o código com o anfitrião.`);
+                console.error('Erro P2P Client:', err);
+                updateCloudStatus('Falha ao conectar P2P', 'text-rose-400');
+                alertBox(`Não foi possível conectar na sala "${code}". Verifique o código ou use Nuvem Supabase/Firebase.`);
             });
         }
 
         function subscribeToRoom(code) {
+            if (!db) return;
             if (roomUnsubscribe) roomUnsubscribe();
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
             showWaitingRoomUI(code);
-
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', code);
             roomUnsubscribe = onSnapshot(roomRef, (snap) => {
                 if (!snap.exists()) {
                     leaveOnlineRoomLocal();
@@ -1279,33 +1380,31 @@
                     return;
                 }
                 handleIncomingRoomSnapshot(snap.data());
-            }, (err) => {
-                console.error('Erro na sincronização da sala:', err);
             });
         }
 
-        async function pushOnlineState(newLogEntry = null, newLogClass = 'text-slate-300') {
+        async function pushOnlineState() {
             if (matchConfig.mode !== 'ONLINE' || !onlineRoomCode || isApplyingRemoteState) return;
-
-            lastSyncedVersion += 1;
-
+            lastSyncedVersion = Math.max(lastSyncedVersion + 1, Date.now());
             const payload = {
                 status: 'PLAYING',
+                config: { ...matchConfig },
                 stateVersion: lastSyncedVersion,
                 gameStateJson: JSON.stringify(gameState),
-                config: { ...matchConfig }
+                logs: window._onlineLogsBuffer || []
             };
 
-            if (newLogEntry) {
-                window._onlineLogsBuffer = window._onlineLogsBuffer || [];
-                window._onlineLogsBuffer.push({ msg: newLogEntry, cls: newLogClass });
-                if (window._onlineLogsBuffer.length > 60) window._onlineLogsBuffer.shift();
-                payload.logs = window._onlineLogsBuffer;
-            } else if (window._onlineLogsBuffer) {
-                payload.logs = window._onlineLogsBuffer;
-            }
-
-            if (networkTransport === 'FIREBASE' && db) {
+            if (networkTransport === 'SUPABASE' && supabaseClient) {
+                try {
+                    await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}`, {
+                        method: 'PATCH',
+                        headers: supabaseHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+                } catch (err) {
+                    console.error('Erro ao enviar jogada para Supabase:', err);
+                }
+            } else if (networkTransport === 'FIREBASE' && db) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                 try {
                     await updateDoc(roomRef, payload);
@@ -1320,6 +1419,51 @@
                     clientConnection.send({ type: 'CLIENT_STATE_UPDATE', payload });
                 }
             }
+        }
+
+        function initLocalDiscoveryChannel() {
+            if (typeof BroadcastChannel === 'undefined') return;
+            try {
+                localChannel = new BroadcastChannel('couplegas_local_rooms_v1');
+                localChannel.onmessage = (event) => {
+                    const msg = event.data;
+                    if (!msg) return;
+                    if (msg.type === 'ROOM_ANNOUNCE' && msg.room && msg.room.code !== onlineRoomCode) {
+                        discoveredLocalRooms[msg.room.code] = { ...msg.room, lastSeen: Date.now() };
+                        renderLocalRoomsList();
+                    } else if (msg.type === 'ROOM_CLOSED' && msg.code) {
+                        delete discoveredLocalRooms[msg.code];
+                        renderLocalRoomsList();
+                    }
+                };
+            } catch (e) {}
+        }
+
+        function renderLocalRoomsList() {
+            if (networkTransport === 'SUPABASE' || networkTransport === 'FIREBASE') return;
+            const listEl = document.getElementById('online-rooms-list');
+            if (!listEl) return;
+            const now = Date.now();
+            const validRooms = Object.values(discoveredLocalRooms).filter(r => now - r.lastSeen < 5000 && r.status === 'WAITING');
+            if (validRooms.length === 0) {
+                listEl.innerHTML = `<div class="text-slate-500 italic py-2 text-center">Nenhuma sala local detectada. Crie uma acima ou insira o código do anfitrião!</div>`;
+                return;
+            }
+            listEl.innerHTML = '';
+            validRooms.forEach(room => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2';
+                row.innerHTML = `
+                    <div>
+                        <span class="font-mono font-bold text-amber-400">${room.code}</span>
+                        <span class="text-slate-300 ml-2">Host: <strong>${room.hostName}</strong></span>
+                        <span class="text-slate-400 ml-2">(${room.count}/10)</span>
+                    </div>
+                    <button class="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded text-[11px]">Entrar</button>
+                `;
+                row.querySelector('button').onclick = () => joinOnlineRoom(room.code);
+                listEl.appendChild(row);
+            });
         }
 
         function leaveOnlineRoomLocal() {
@@ -1344,30 +1488,54 @@
             onlineRoomCode = null;
             isOnlineHost = false;
             window._onlineLogsBuffer = [];
-            updateCloudStatus(networkTransport === 'FIREBASE' ? 'Nuvem Firebase Conectada' : 'Rede Global P2P Pronta', 'text-emerald-400');
+            const statusText = networkTransport === 'SUPABASE'
+                ? 'Nuvem Supabase Conectada'
+                : networkTransport === 'FIREBASE'
+                    ? 'Nuvem Firebase Conectada'
+                    : 'Modo P2P (Configure Nuvem acima p/ Global)';
+            updateCloudStatus(statusText, networkTransport === 'P2P' ? 'text-amber-400' : 'text-emerald-400');
             document.getElementById('online-waiting-room').classList.add('hidden');
             document.getElementById('online-join-create-box').classList.remove('hidden');
             document.getElementById('online-public-rooms-box').classList.remove('hidden');
         }
 
         async function leaveOnlineRoom() {
-            if (networkTransport === 'FIREBASE' && db && onlineRoomCode && currentUserUid) {
+            if (networkTransport === 'SUPABASE' && supabaseClient && onlineRoomCode) {
+                try {
+                    if (isOnlineHost) {
+                        await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}`, {
+                            method: 'DELETE',
+                            headers: supabaseHeaders()
+                        });
+                    } else {
+                        const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}&select=members`, {
+                            headers: supabaseHeaders()
+                        });
+                        const rows = res.ok ? await res.json() : [];
+                        if (rows[0]) {
+                            const updatedMembers = (rows[0].members || []).filter(m => m.uid !== currentUserUid);
+                            await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}`, {
+                                method: 'PATCH',
+                                headers: supabaseHeaders(),
+                                body: JSON.stringify({ members: updatedMembers })
+                            });
+                        }
+                    }
+                } catch (e) {}
+            } else if (networkTransport === 'FIREBASE' && db && onlineRoomCode && currentUserUid) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                 try {
-                    const snap = await getDoc(roomRef);
-                    if (snap.exists()) {
-                        const data = snap.data();
-                        if (data.hostUid === currentUserUid) {
-                            await deleteDoc(roomRef);
-                        } else {
-                            const updatedMembers = (data.members || []).filter(m => m.uid !== currentUserUid);
+                    if (isOnlineHost) {
+                        await deleteDoc(roomRef);
+                    } else {
+                        const snap = await getDoc(roomRef);
+                        if (snap.exists()) {
+                            const updatedMembers = (snap.data().members || []).filter(m => m.uid !== currentUserUid);
                             await updateDoc(roomRef, { members: updatedMembers });
                         }
                     }
-                } catch (e) {
-                    console.error(e);
-                }
-            } else if (networkTransport === 'P2P' && !isOnlineHost && clientConnection && clientConnection.open) {
+                } catch (e) {}
+            } else if (networkTransport === 'P2P' && clientConnection && clientConnection.open) {
                 try {
                     clientConnection.send({ type: 'LEAVE_ROOM', uid: currentUserUid });
                 } catch (e) {}
@@ -1708,7 +1876,13 @@
 
         document.getElementById('btn-launch-game').onclick = async () => {
             if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
-                if (networkTransport === 'FIREBASE' && db && isOnlineHost) {
+                if (networkTransport === 'SUPABASE' && supabaseClient && isOnlineHost) {
+                    await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}`, {
+                        method: 'PATCH',
+                        headers: supabaseHeaders(),
+                        body: JSON.stringify({ config: { ...matchConfig } })
+                    });
+                } else if (networkTransport === 'FIREBASE' && db && isOnlineHost) {
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                     await updateDoc(roomRef, { config: { ...matchConfig } });
                 } else if (networkTransport === 'P2P' && isOnlineHost && p2pRoomData) {
@@ -1763,7 +1937,13 @@
             let rawPlayers = [];
             if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
                 let members = [];
-                if (networkTransport === 'FIREBASE' && db) {
+                if (networkTransport === 'SUPABASE' && supabaseClient) {
+                    const res = await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}&select=members`, {
+                        headers: supabaseHeaders()
+                    });
+                    const rows = res.ok ? await res.json() : [];
+                    members = rows[0] ? (rows[0].members || []) : [];
+                } else if (networkTransport === 'FIREBASE' && db) {
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'couplegas_rooms', onlineRoomCode);
                     const snap = await getDoc(roomRef);
                     members = snap.exists() ? (snap.data().members || []) : [];
