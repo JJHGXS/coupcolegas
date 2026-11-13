@@ -159,6 +159,49 @@
         .party-stage-box {
             animation: discoLights 1.8s infinite;
         }
+
+        /* Balões de Pensamento e Fala dos Jogadores */
+        @keyframes thoughtFloat {
+            0%, 100% { transform: translate(-50%, -100%) translateY(0px); }
+            50% { transform: translate(-50%, -100%) translateY(-5px); }
+        }
+        .thought-bubble {
+            transform: translate(-50%, -100%);
+            animation: thoughtFloat 1.6s ease-in-out infinite;
+        }
+        .thought-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -7px;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background: #1e293b;
+            border-right: 1px solid #f59e0b;
+            border-bottom: 1px solid #f59e0b;
+            transform: translateX(-50%) rotate(45deg);
+        }
+
+        @keyframes speechPop {
+            0% { transform: translate(-50%, -100%) scale(0.75); opacity: 0; }
+            15% { transform: translate(-50%, -100%) scale(1.04); opacity: 1; }
+            85% { transform: translate(-50%, -100%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -105%) scale(0.95); opacity: 0; }
+        }
+        .speech-bubble {
+            transform: translate(-50%, -100%);
+            animation: speechPop 3.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -7px;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            background: #f8fafc;
+            transform: translateX(-50%) rotate(45deg);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans overflow-x-hidden">
@@ -497,11 +540,24 @@
                         <div class="mt-2 max-w-[88%]">
                             <div id="turn-indicator" class="font-cinzel text-xs sm:text-sm font-bold text-amber-300">Aguardando início...</div>
                             <div id="status-message" class="text-[11px] text-slate-200 mt-0.5 line-clamp-2">Prepare sua estratégia.</div>
+                            <!-- Cronômetro Rápido de Reação (4s) -->
+                            <div id="reaction-timer-wrapper" class="hidden mt-1.5 w-full max-w-[210px] mx-auto">
+                                <div class="flex justify-between text-[10px] font-bold text-amber-300 mb-0.5">
+                                    <span><i class="fa-solid fa-bolt mr-1"></i>Janela de Reação</span>
+                                    <span id="reaction-timer-text">4.0s</span>
+                                </div>
+                                <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-amber-500/40">
+                                    <div id="reaction-timer-bar" class="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 transition-all duration-100" style="width: 100%;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Camada de Assentos ao Redor da Mesa -->
                     <div id="circular-seats-layer" class="absolute inset-0 pointer-events-none z-20"></div>
+
+                    <!-- Camada de Balões de Pensamento e Fala -->
+                    <div id="table-bubbles-layer" class="absolute inset-0 pointer-events-none z-30 overflow-visible"></div>
 
                     <!-- Camada de Efeitos Visuais na Mesa (Roubo / Morte) -->
                     <div id="table-fx-layer" class="absolute inset-0 pointer-events-none z-30 overflow-visible"></div>
@@ -513,7 +569,13 @@
                         
                         <!-- Suas Cartas e Moedas -->
                         <div class="flex items-center gap-3">
-                            <div id="human-cards-container" class="flex gap-2"></div>
+                            <div class="flex flex-col items-center gap-1.5">
+                                <div id="human-cards-container" class="flex gap-2"></div>
+                                <button id="btn-peek-cards" type="button" class="w-full bg-slate-800 hover:bg-slate-700 active:bg-amber-600 active:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg py-1 px-2 text-[11px] font-bold flex items-center justify-center gap-1.5 transition select-none touch-none">
+                                    <i id="peek-cards-icon" class="fa-solid fa-eye-slash"></i>
+                                    <span id="peek-cards-label">Segurar p/ Ver Cartas</span>
+                                </button>
+                            </div>
                             <div class="space-y-1">
                                 <div class="text-xs font-bold text-slate-200" id="human-name-label">Você</div>
                                 <div class="text-base font-black text-amber-400"><i class="fa-solid fa-coins mr-1"></i><span id="human-coins">2</span> moedas</div>
@@ -712,6 +774,12 @@
         let publicRoomsUnsubscribe = null;
         let isApplyingRemoteState = false;
         let lastSyncedVersion = -1;
+        let isEditingOnlineConfig = false;
+        let isPeekingMyCards = false;
+        let reactionTimerInterval = null;
+        let reactionCountdownRemaining = 4.0;
+        let activeSpeechBubbles = {};
+        let currentThoughtState = null;
 
         // PeerJS Global P2P (Fallback quando nenhum banco em nuvem está configurado)
         let networkTransport = 'P2P'; // 'FIREBASE', 'SUPABASE' ou 'P2P'
@@ -942,8 +1010,10 @@
             if (data.status === 'WAITING') {
                 document.getElementById('game-screen').classList.add('hidden');
                 document.getElementById('lobby-screen').classList.remove('hidden');
-                document.getElementById('lobby-step-online').classList.remove('hidden');
-                document.getElementById('lobby-step-config').classList.add('hidden');
+                if (!isEditingOnlineConfig) {
+                    document.getElementById('lobby-step-online').classList.remove('hidden');
+                    document.getElementById('lobby-step-config').classList.add('hidden');
+                }
 
                 const members = data.members || [];
                 document.getElementById('waiting-players-count').innerText = members.length;
@@ -961,11 +1031,12 @@
                 document.getElementById('waiting-host-controls').classList.toggle('hidden', !isOnlineHost);
                 document.getElementById('waiting-guest-notice').classList.toggle('hidden', isOnlineHost);
                 document.getElementById('btn-online-start-match').disabled = members.length < 2;
-                if (data.config) {
+                if (data.config && !isEditingOnlineConfig) {
                     Object.assign(matchConfig, data.config);
                     matchConfig.mode = 'ONLINE';
                 }
             } else if (data.status === 'PLAYING' && data.gameStateJson) {
+                isEditingOnlineConfig = false;
                 const incomingVersion = data.stateVersion || 0;
                 if (incomingVersion <= lastSyncedVersion && !document.getElementById('game-screen').classList.contains('hidden')) {
                     return;
@@ -984,12 +1055,24 @@
                     document.getElementById('lobby-screen').classList.add('hidden');
                     document.getElementById('game-screen').classList.remove('hidden');
                     syncOnlineHudAndLogs(data.logs || []);
+                    updateHostOnlyControls();
+                    if (gameState.lastSpeech) {
+                        showPlayerSpeechBubble(gameState.lastSpeech.playerId, gameState.lastSpeech.text, gameState.lastSpeech.type);
+                    }
                     updateUI();
                     handleOnlinePostSyncUI();
                 } finally {
                     isApplyingRemoteState = false;
                 }
             }
+        }
+
+        function updateHostOnlyControls() {
+            const isOnlineGuest = matchConfig.mode === 'ONLINE' && !isOnlineHost;
+            const btnRestart = document.getElementById('btn-restart-match');
+            const btnRematch = document.getElementById('btn-victory-rematch');
+            if (btnRestart) btnRestart.classList.toggle('hidden', isOnlineGuest);
+            if (btnRematch) btnRematch.classList.toggle('hidden', isOnlineGuest);
         }
 
         function syncOnlineHudAndLogs(logs) {
@@ -1024,12 +1107,14 @@
 
         function handleOnlinePostSyncUI() {
             hideReactionControls();
+            stopReactionWindowTimer();
             document.getElementById('action-buttons').classList.remove('hidden');
 
             const human = getHumanPlayer();
             if (!human) return;
 
             if (gameState.phase === 'GAME_OVER') {
+                clearPlayerThoughtBubble();
                 checkTurnPhase();
                 return;
             }
@@ -1037,32 +1122,48 @@
             if (gameState.phase === 'ACTION_SELECTION') {
                 checkTurnPhase();
             } else if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                clearPlayerThoughtBubble();
                 const passed = gameState.pendingAction.passedUids || [];
                 if (!passed.includes(currentUserUid)) {
                     promptReactionsForAction();
                 } else {
                     const actor = gameState.players.find(p => p.id === gameState.pendingAction.sourceId);
                     document.getElementById('status-message').innerText = `Você permitiu. Aguardando os demais jogadores reagirem a ${actor ? actor.name : ''}...`;
+                    startReactionWindowTimer(4.0, () => {
+                        if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                            resolvePendingAction();
+                        }
+                    });
                 }
             } else if (gameState.phase === 'BLOCK_REACTION_WINDOW' && gameState.pendingAction) {
+                clearPlayerThoughtBubble();
                 const blocker = gameState.players.find(p => p.id === gameState.pendingAction.blockerId);
-                if (blocker && !isLocalController(blocker) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
+                const passedBlock = gameState.pendingAction.blockPassedUids || [];
+                if (blocker && !isLocalController(blocker) && !passedBlock.includes(currentUserUid) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
                     renderBlockReactionButtonsForLocal(blocker, gameState.pendingAction.blockRole);
                 } else {
                     document.getElementById('status-message').innerText = `Aguardando resposta ao bloqueio de ${blocker ? blocker.name : ''}...`;
+                    startReactionWindowTimer(4.0, () => {
+                        if (gameState.phase === 'BLOCK_REACTION_WINDOW' && blocker) {
+                            logMessage(`⏱️ Tempo esgotado! Bloqueio de ${blocker.name} mantido.`, 'text-slate-400');
+                            nextTurn();
+                        }
+                    });
                 }
             } else if (gameState.phase === 'LOSE_INFLUENCE_WINDOW') {
+                clearPlayerThoughtBubble();
                 const targetPlayer = gameState.players.find(p => p.id === gameState.pendingLosePlayerId);
                 if (targetPlayer && isLocalController(targetPlayer)) {
                     const afterStep = gameState.pendingAfterLose;
-                    gameState.pendingLosePlayerId = null;
                     promptLoseInfluence(targetPlayer.id, () => {
+                        gameState.pendingLosePlayerId = null;
+                        gameState.pendingAfterLose = null;
                         if (afterStep === 'RESOLVE_ACTION') {
                             resolvePendingAction();
                         } else {
                             nextTurn();
                         }
-                    });
+                    }, afterStep);
                 } else if (targetPlayer) {
                     document.getElementById('status-message').innerText = `Aguardando ${targetPlayer.name} escolher qual carta revelar...`;
                 }
@@ -1657,13 +1758,20 @@
             stopTurnTimer();
             const badge = document.getElementById('hud-timer-badge');
             const label = document.getElementById('hud-timer-seconds');
+            const current = gameState.players[gameState.turnIndex];
             if (!matchConfig.timerEnabled) {
                 if (badge) badge.classList.add('hidden');
+                if (current && gameState.phase === 'ACTION_SELECTION') {
+                    setPlayerThoughtBubble(current.id, 'Pensando na jogada...', null);
+                }
                 return;
             }
             turnTimeRemaining = matchConfig.timerSeconds;
             if (badge) badge.classList.remove('hidden');
             if (label) label.innerText = `${turnTimeRemaining}s`;
+            if (current && gameState.phase === 'ACTION_SELECTION') {
+                setPlayerThoughtBubble(current.id, 'Pensando na jogada...', turnTimeRemaining);
+            }
 
             const currentSession = matchSessionId;
             turnTimerInterval = setInterval(() => {
@@ -1673,9 +1781,11 @@
                 }
                 turnTimeRemaining--;
                 if (label) label.innerText = `${Math.max(0, turnTimeRemaining)}s`;
+                if (current && gameState.phase === 'ACTION_SELECTION') {
+                    setPlayerThoughtBubble(current.id, 'Pensando na jogada...', Math.max(0, turnTimeRemaining));
+                }
                 if (turnTimeRemaining <= 0) {
                     stopTurnTimer();
-                    const current = gameState.players[gameState.turnIndex];
                     if (current && gameState.phase === 'ACTION_SELECTION' && isLocalController(current)) {
                         logMessage(`⏰ Tempo esgotado! ${current.name} comprou 1 moeda automaticamente.`, 'text-amber-400');
                         executeAction({ type: 'INCOME', sourceId: current.id });
@@ -1695,9 +1805,121 @@
             }
         }
 
+        function startReactionWindowTimer(seconds = 4.0, onTimeout = null) {
+            stopReactionWindowTimer();
+            const wrapper = document.getElementById('reaction-timer-wrapper');
+            const textEl = document.getElementById('reaction-timer-text');
+            const barEl = document.getElementById('reaction-timer-bar');
+            if (!wrapper || !textEl || !barEl) return;
+
+            reactionCountdownRemaining = seconds;
+            wrapper.classList.remove('hidden');
+            textEl.innerText = `${reactionCountdownRemaining.toFixed(1)}s`;
+            barEl.style.width = '100%';
+
+            const currentSession = matchSessionId;
+            reactionTimerInterval = setInterval(() => {
+                if (matchSessionId !== currentSession) {
+                    stopReactionWindowTimer();
+                    return;
+                }
+                reactionCountdownRemaining = Math.max(0, reactionCountdownRemaining - 0.1);
+                textEl.innerText = `${reactionCountdownRemaining.toFixed(1)}s`;
+                barEl.style.width = `${(reactionCountdownRemaining / seconds) * 100}%`;
+
+                if (reactionCountdownRemaining <= 0) {
+                    stopReactionWindowTimer();
+                    if (onTimeout) onTimeout();
+                }
+            }, 100);
+        }
+
+        function stopReactionWindowTimer() {
+            if (reactionTimerInterval) {
+                clearInterval(reactionTimerInterval);
+                reactionTimerInterval = null;
+            }
+            const wrapper = document.getElementById('reaction-timer-wrapper');
+            if (wrapper) wrapper.classList.add('hidden');
+        }
+
+        // =========================================================
+        // THOUGHT & SPEECH BUBBLES SYSTEM
+        // =========================================================
+        function setPlayerThoughtBubble(playerId, text, secondsLeft = null) {
+            currentThoughtState = { playerId, text, secondsLeft };
+            renderTableBubbles();
+        }
+
+        function clearPlayerThoughtBubble() {
+            currentThoughtState = null;
+            renderTableBubbles();
+        }
+
+        function showPlayerSpeechBubble(playerId, text, type = 'ACTION') {
+            const stamp = Date.now() + Math.random();
+            activeSpeechBubbles[playerId] = { text, type, stamp };
+
+            if (matchConfig.mode === 'ONLINE' && !isApplyingRemoteState) {
+                gameState.lastSpeech = { playerId, text, type, stamp };
+            }
+
+            renderTableBubbles();
+            setTimeout(() => {
+                if (activeSpeechBubbles[playerId] && activeSpeechBubbles[playerId].stamp === stamp) {
+                    delete activeSpeechBubbles[playerId];
+                    renderTableBubbles();
+                }
+            }, 3800);
+        }
+
+        function renderTableBubbles() {
+            const layer = document.getElementById('table-bubbles-layer');
+            if (!layer) return;
+            layer.innerHTML = '';
+
+            if (currentThoughtState && gameState.phase === 'ACTION_SELECTION') {
+                const pos = getPlayerSeatCoords(currentThoughtState.playerId);
+                const el = document.createElement('div');
+                el.className = 'thought-bubble absolute bg-slate-800/95 border border-amber-400/80 text-amber-200 px-2.5 py-1 rounded-xl text-[10px] font-bold shadow-xl whitespace-nowrap flex items-center gap-1.5 z-30';
+                el.style.left = `${pos.x}%`;
+                el.style.top = `${Math.max(10, pos.y - 10)}%`;
+                const timerTag = currentThoughtState.secondsLeft !== null
+                    ? `<span class="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">${currentThoughtState.secondsLeft}s</span>`
+                    : '';
+                el.innerHTML = `<i class="fa-solid fa-comment-dots text-amber-400 animate-pulse"></i><span>${currentThoughtState.text}</span>${timerTag}`;
+                layer.appendChild(el);
+            }
+
+            Object.entries(activeSpeechBubbles).forEach(([pidStr, bubble]) => {
+                const pid = parseInt(pidStr, 10);
+                const pos = getPlayerSeatCoords(pid);
+                const el = document.createElement('div');
+
+                let borderStyle = 'border-amber-400 bg-slate-50 text-slate-900';
+                let iconHtml = '<i class="fa-solid fa-bullhorn text-amber-600 mr-1"></i>';
+                if (bubble.type === 'BLOCK') {
+                    borderStyle = 'border-sky-500 bg-sky-50 text-slate-900';
+                    iconHtml = '<i class="fa-solid fa-shield-halved text-sky-600 mr-1"></i>';
+                } else if (bubble.type === 'CHALLENGE') {
+                    borderStyle = 'border-rose-600 bg-rose-50 text-rose-950';
+                    iconHtml = '<i class="fa-solid fa-gavel text-rose-600 mr-1"></i>';
+                }
+
+                el.className = `speech-bubble absolute border-2 ${borderStyle} px-3 py-1.5 rounded-2xl text-[11px] font-extrabold shadow-2xl max-w-[215px] text-center leading-tight z-40`;
+                el.style.left = `${pos.x}%`;
+                el.style.top = `${Math.max(8, pos.y - 11)}%`;
+                el.innerHTML = `${iconHtml}${bubble.text}`;
+                layer.appendChild(el);
+            });
+        }
+
         function resetAllModalsAndTimers() {
             stopTurnTimer();
+            stopReactionWindowTimer();
             stopFireworks();
+            clearPlayerThoughtBubble();
+            activeSpeechBubbles = {};
             hideReactionControls();
             document.getElementById('action-buttons').classList.remove('hidden');
             ['modal-target', 'modal-exchange', 'modal-inspect', 'modal-lose-influence', 'victory-overlay'].forEach(id => {
@@ -1784,6 +2006,7 @@
         document.getElementById('btn-leave-online-room').onclick = () => leaveOnlineRoom();
 
         document.getElementById('btn-online-configure-rules').onclick = () => {
+            isEditingOnlineConfig = true;
             document.getElementById('cfg-difficulty-wrapper').classList.add('hidden');
             document.getElementById('cfg-players-wrapper').classList.add('hidden');
             document.getElementById('btn-launch-game').innerHTML = `<i class="fa-solid fa-check mr-2"></i> Salvar Regras da Sala`;
@@ -1846,6 +2069,7 @@
         };
 
         document.getElementById('btn-back-mode').onclick = () => {
+            isEditingOnlineConfig = false;
             document.getElementById('lobby-step-config').classList.add('hidden');
             if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
                 document.getElementById('lobby-step-online').classList.remove('hidden');
@@ -1880,6 +2104,7 @@
 
         document.getElementById('btn-launch-game').onclick = async () => {
             if (matchConfig.mode === 'ONLINE' && onlineRoomCode) {
+                isEditingOnlineConfig = false;
                 if (networkTransport === 'SUPABASE' && supabaseClient && isOnlineHost) {
                     await fetch(`${supabaseClient.url}/rest/v1/couplegas_rooms?code=eq.${onlineRoomCode}`, {
                         method: 'PATCH',
@@ -2055,6 +2280,7 @@
             if (matchConfig.mode === 'ONLINE') {
                 document.getElementById('lobby-screen').classList.add('hidden');
                 document.getElementById('game-screen').classList.remove('hidden');
+                updateHostOnlyControls();
                 await pushOnlineState();
             }
 
@@ -2132,12 +2358,19 @@
                         <span class="text-[11px] font-bold line-through text-slate-500">${char.name}</span>
                         <span class="text-[9px] text-rose-500 uppercase font-bold mt-1">Revelada</span>
                     `;
-                } else {
-                    el.className = `w-24 h-32 rounded-xl border-2 ${char.color} shadow-lg flex flex-col justify-between items-center p-2.5`;
+                } else if (isPeekingMyCards) {
+                    el.className = `w-24 h-32 rounded-xl border-2 ${char.color} shadow-lg flex flex-col justify-between items-center p-2.5 transition`;
                     el.innerHTML = `
                         <span class="text-[9px] uppercase font-bold tracking-wider opacity-80">Influência</span>
                         <i class="fa-solid ${char.icon} text-2xl"></i>
                         <span class="text-xs font-bold">${char.name}</span>
+                    `;
+                } else {
+                    el.className = 'w-24 h-32 rounded-xl border-2 border-amber-500/40 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 shadow-lg flex flex-col justify-between items-center p-2.5 transition';
+                    el.innerHTML = `
+                        <span class="text-[9px] uppercase font-bold tracking-wider text-slate-500">Oculta</span>
+                        <i class="fa-solid fa-eye-slash text-2xl text-amber-500/60"></i>
+                        <span class="text-[10px] font-bold text-slate-400">Segure p/ ver</span>
                     `;
                 }
                 cardsContainer.appendChild(el);
@@ -2292,13 +2525,28 @@
             } else if (matchConfig.mode === 'ONLINE') {
                 stopTurnTimer();
                 document.getElementById('status-message').innerText = `Aguardando jogada de ${current.name}...`;
+                setPlayerThoughtBubble(current.id, 'Pensando na jogada...', null);
             } else {
-                document.getElementById('status-message').innerText = `${current.name} está decidindo sua jogada...`;
-                startTurnTimer();
+                const thinkDurationMs = 1600 + Math.floor(Math.random() * 1400);
+                let botThinkSecs = Math.ceil(thinkDurationMs / 1000);
+                document.getElementById('status-message').innerText = `${current.name} está analisando a mesa...`;
+                setPlayerThoughtBubble(current.id, 'Analisando a mesa...', botThinkSecs);
+
+                const thinkCountdown = setInterval(() => {
+                    if (matchSessionId !== currentSession || gameState.phase !== 'ACTION_SELECTION') {
+                        clearInterval(thinkCountdown);
+                        return;
+                    }
+                    botThinkSecs = Math.max(1, botThinkSecs - 1);
+                    setPlayerThoughtBubble(current.id, 'Analisando a mesa...', botThinkSecs);
+                }, 1000);
+
                 setTimeout(() => {
+                    clearInterval(thinkCountdown);
                     if (matchSessionId !== currentSession) return;
+                    clearPlayerThoughtBubble();
                     botTakeTurn(current);
-                }, 1100);
+                }, thinkDurationMs);
             }
         }
 
@@ -2935,12 +3183,14 @@
         // =========================================================
         function executeAction(action) {
             stopTurnTimer();
+            clearPlayerThoughtBubble();
             gameState.pendingAction = action;
             const actor = gameState.players.find(p => p.id === action.sourceId);
 
             if (action.type === 'INCOME') {
                 actor.coins += 1;
                 gameState.bank -= 1;
+                showPlayerSpeechBubble(actor.id, 'Pego 1 moeda de Renda!', 'ACTION');
                 logMessage(`${actor.name} pegou 1 moeda de Renda.`, 'text-emerald-400');
                 nextTurn();
                 return;
@@ -2950,6 +3200,7 @@
                 actor.coins -= 7;
                 gameState.bank += 7;
                 const target = gameState.players.find(p => p.id === action.targetId);
+                showPlayerSpeechBubble(actor.id, `Golpe de Estado contra ${target.name}!`, 'ACTION');
                 logMessage(`💥 ${actor.name} deu um GOLPE DE ESTADO em ${target.name}!`, 'text-red-500 font-bold');
                 promptLoseInfluence(target.id, () => nextTurn());
                 return;
@@ -2961,6 +3212,7 @@
                 const target = gameState.players.find(p => p.id === action.targetId);
                 target.team = target.team === 'CATHOLIC' ? 'PROTESTANT' : 'CATHOLIC';
                 const newTeamLabel = target.team === 'CATHOLIC' ? 'Católico' : 'Protestante';
+                showPlayerSpeechBubble(actor.id, `Converto ${target.name} para ${newTeamLabel}!`, 'ACTION');
                 logMessage(`⛪ ${actor.name} pagou 1 moeda ao Asilo e converteu ${target.name} para ${newTeamLabel}!`, 'text-cyan-400 font-semibold');
                 nextTurn();
                 return;
@@ -2971,6 +3223,7 @@
                 gameState.asylum += 2;
                 actor.team = actor.team === 'CATHOLIC' ? 'PROTESTANT' : 'CATHOLIC';
                 const newTeamLabel = actor.team === 'CATHOLIC' ? 'Católico' : 'Protestante';
+                showPlayerSpeechBubble(actor.id, `Converto a mim mesmo para ${newTeamLabel}!`, 'ACTION');
                 logMessage(`⛪ ${actor.name} pagou 2 moedas ao Asilo e converteu a si mesmo para ${newTeamLabel}!`, 'text-cyan-400 font-semibold');
                 nextTurn();
                 return;
@@ -2986,15 +3239,34 @@
 
             const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
             let actionDesc = '';
-            if (action.type === 'FOREIGN_AID') actionDesc = `Ajuda Externa (+2)`;
-            else if (action.type === 'TAX') actionDesc = `Taxar (+3) como Duque`;
-            else if (action.type === 'ASSASSINATE') actionDesc = `Assassinar ${target.name} como Assassino`;
-            else if (action.type === 'STEAL') actionDesc = `Extorquir ${target.name} como Capitão`;
-            else if (action.type === 'EXCHANGE') actionDesc = `Trocar cartas como Embaixador`;
-            else if (action.type === 'INQUISITOR_SELF') actionDesc = `Trocar 1 carta como Inquisidor`;
-            else if (action.type === 'INQUISITOR_INSPECT') actionDesc = `Investigar ${target.name} como Inquisidor`;
-            else if (action.type === 'EMBEZZLE') actionDesc = `Roubar o Asilo (${gameState.asylum} moedas) alegando NÃO ter o Duque`;
+            let speechText = '';
+            if (action.type === 'FOREIGN_AID') {
+                actionDesc = `Ajuda Externa (+2)`;
+                speechText = `Peço 2 moedas de Ajuda Externa!`;
+            } else if (action.type === 'TAX') {
+                actionDesc = `Taxar (+3) como Duque`;
+                speechText = `Sou o Duque e pego 3 moedas!`;
+            } else if (action.type === 'ASSASSINATE') {
+                actionDesc = `Assassinar ${target.name} como Assassino`;
+                speechText = `Sou o Assassino e ataco ${target.name}!`;
+            } else if (action.type === 'STEAL') {
+                actionDesc = `Extorquir ${target.name} como Capitão`;
+                speechText = `Sou o Capitão e roubo 2 moedas de ${target.name}!`;
+            } else if (action.type === 'EXCHANGE') {
+                actionDesc = `Trocar cartas como Embaixador`;
+                speechText = `Sou o Embaixador e troco minhas cartas!`;
+            } else if (action.type === 'INQUISITOR_SELF') {
+                actionDesc = `Trocar 1 carta como Inquisidor`;
+                speechText = `Sou o Inquisidor e troco 1 carta!`;
+            } else if (action.type === 'INQUISITOR_INSPECT') {
+                actionDesc = `Investigar ${target.name} como Inquisidor`;
+                speechText = `Sou o Inquisidor e investigo ${target.name}!`;
+            } else if (action.type === 'EMBEZZLE') {
+                actionDesc = `Roubar o Asilo (${gameState.asylum} moedas) alegando NÃO ter o Duque`;
+                speechText = `Não sou o Duque e pego ${gameState.asylum} moedas do Asilo!`;
+            }
 
+            showPlayerSpeechBubble(actor.id, speechText, 'ACTION');
             document.getElementById('status-message').innerText = `${actor.name} declarou: ${actionDesc}.`;
             logMessage(`${actor.name} declarou: ${actionDesc}.`, 'text-amber-300 font-semibold');
             if (matchConfig.mode === 'ONLINE') pushOnlineState();
@@ -3083,24 +3355,26 @@
                     const suffix = target.id === human.id ? '' : ` p/ ${target.name}`;
                     const btnCapt = document.createElement('button');
                     btnCapt.className = 'action-btn bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-sky-500';
-                    btnCapt.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloq. Capitão${suffix}`;
+                    btnCapt.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Blefar/Bloq. Capitão${suffix}`;
                     btnCapt.onclick = () => handleBlock(human.id, 'CAPTAIN');
                     container.appendChild(btnCapt);
 
-                    const hasAmb = matchConfig.specialRole === 'AMBASSADOR' || matchConfig.numPlayers === 10;
-                    if (hasAmb) {
-                        const btnAmb = document.createElement('button');
-                        btnAmb.className = 'action-btn bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-emerald-500';
-                        btnAmb.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Bloq. ${CHARACTERS.AMBASSADOR.name}${suffix}`;
-                        btnAmb.onclick = () => handleBlock(human.id, 'AMBASSADOR');
-                        container.appendChild(btnAmb);
-                    }
+                    const btnAmb = document.createElement('button');
+                    btnAmb.className = 'action-btn bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-emerald-500';
+                    btnAmb.innerHTML = `<i class="fa-solid fa-shield mr-1"></i> Blefar/Bloq. Embaixador${suffix}`;
+                    btnAmb.onclick = () => handleBlock(human.id, 'AMBASSADOR');
+                    container.appendChild(btnAmb);
                 }
 
                 if (!hasOptions) {
                     hideReactionControls();
                     if (matchConfig.mode === 'ONLINE') {
                         document.getElementById('status-message').innerText = `Aguardando outros jogadores reagirem a ${actor.name}...`;
+                        startReactionWindowTimer(4.0, () => {
+                            if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                                resolvePendingAction();
+                            }
+                        });
                     } else {
                         simulateBotReactionsToAction();
                     }
@@ -3112,6 +3386,7 @@
                 btnPass.innerText = 'Permitir / Passar';
                 btnPass.onclick = () => {
                     hideReactionControls();
+                    stopReactionWindowTimer();
                     if (matchConfig.mode === 'ONLINE') {
                         recordOnlinePassAndCheckResolve();
                     } else {
@@ -3119,14 +3394,30 @@
                     }
                 };
                 container.appendChild(btnPass);
+
+                startReactionWindowTimer(4.0, () => {
+                    if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                        hideReactionControls();
+                        if (matchConfig.mode === 'ONLINE') {
+                            recordOnlinePassAndCheckResolve(true);
+                        } else {
+                            simulateBotReactionsToAction();
+                        }
+                    }
+                });
             } else if (matchConfig.mode === 'ONLINE') {
-                document.getElementById('status-message').innerText = `Aguardando reação dos oponentes na nuvem...`;
+                document.getElementById('status-message').innerText = `Aguardando reação dos oponentes (4s)...`;
+                startReactionWindowTimer(4.0, () => {
+                    if (gameState.phase === 'ACTION_REACTION_WINDOW' && gameState.pendingAction) {
+                        resolvePendingAction();
+                    }
+                });
             } else {
                 simulateBotReactionsToAction();
             }
         }
 
-        function recordOnlinePassAndCheckResolve() {
+        function recordOnlinePassAndCheckResolve(forceTimeoutResolve = false) {
             const action = gameState.pendingAction;
             if (!action) return;
             action.passedUids = action.passedUids || [];
@@ -3134,13 +3425,177 @@
                 action.passedUids.push(currentUserUid);
             }
             const eligibleResponders = gameState.players.filter(p =>
-                p.id !== action.sourceId && p.cards.some(c => !c.revealed)
+                p.id !== action.sourceId && p.cards.some(c => !c.revealed) && !areAlliesRestricted(p, gameState.players.find(a => a.id === action.sourceId))
             );
-            if (action.passedUids.length >= eligibleResponders.length) {
+            if (forceTimeoutResolve || action.passedUids.length >= eligibleResponders.length) {
                 resolvePendingAction();
             } else {
                 pushOnlineState();
             }
+        }
+
+        function handleBlock(blockerId, blockRole) {
+            if (gameState.phase !== 'ACTION_REACTION_WINDOW' || !gameState.pendingAction) return;
+            hideReactionControls();
+            stopReactionWindowTimer();
+
+            const action = gameState.pendingAction;
+            const blocker = gameState.players.find(p => p.id === blockerId);
+            const roleName = CHARACTERS[blockRole].name;
+
+            let reason = `Sou ${roleName} e bloqueio esta ação!`;
+            if (action.type === 'FOREIGN_AID') reason = `Sou o ${roleName} e bloqueio a Ajuda Externa!`;
+            else if (action.type === 'EMBEZZLE') reason = `Sou o ${roleName} e bloqueio o roubo ao Asilo!`;
+            else if (action.type === 'ASSASSINATE') reason = `Sou a ${roleName} e bloqueio o assassinato!`;
+            else if (action.type === 'STEAL') reason = `Sou ${roleName} e bloqueio a extorsão!`;
+
+            action.blockerId = blockerId;
+            action.blockRole = blockRole;
+            action.blockPassedUids = [];
+            gameState.phase = 'BLOCK_REACTION_WINDOW';
+
+            showPlayerSpeechBubble(blocker.id, reason, 'BLOCK');
+            logMessage(`🛡️ ${blocker.name} BLOQUEOU: "${reason}"`, 'text-sky-400 font-bold');
+            document.getElementById('status-message').innerText = `${blocker.name} bloqueou como ${roleName}! Alguém contesta?`;
+
+            if (matchConfig.mode === 'ONLINE') {
+                pushOnlineState();
+            }
+
+            const human = getHumanPlayer();
+            if (human && !isLocalController(blocker) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
+                renderBlockReactionButtonsForLocal(blocker, blockRole);
+            } else if (matchConfig.mode !== 'ONLINE') {
+                simulateBotReactionsToBlock(blocker, blockRole);
+            } else {
+                startReactionWindowTimer(4.0, () => {
+                    if (gameState.phase === 'BLOCK_REACTION_WINDOW') {
+                        logMessage(`⏱️ Tempo esgotado! Bloqueio de ${blocker.name} mantido.`, 'text-slate-400');
+                        nextTurn();
+                    }
+                });
+            }
+        }
+
+        function simulateBotReactionsToAction() {
+            const action = gameState.pendingAction;
+            if (!action || gameState.phase !== 'ACTION_REACTION_WINDOW') return;
+
+            const actor = gameState.players.find(p => p.id === action.sourceId);
+            const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
+            const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
+            const currentSession = matchSessionId;
+
+            const bots = gameState.players.filter(p => !p.isHuman && p.id !== actor.id && p.cards.some(c => !c.revealed));
+            const shuffledBots = [...bots].sort(() => Math.random() - 0.5);
+
+            let decidedBot = null;
+            let decisionType = null;
+            let blockRoleChoice = null;
+
+            for (const bot of shuffledBots) {
+                if ((action.claimedRole || action.type === 'EMBEZZLE') && canPlayerChallenge(bot, actor)) {
+                    let chance = profile.challengeRate;
+                    if (action.claimedRole) {
+                        const myCopies = bot.cards.filter(c => !c.revealed && c.character === action.claimedRole).length;
+                        const revCopies = gameState.players.flatMap(p => p.cards).filter(c => c.revealed && c.character === action.claimedRole).length;
+                        if (myCopies + revCopies >= getCopiesPerRole(gameState.players.length)) {
+                            chance = 0.95;
+                        }
+                    }
+                    if (Math.random() < chance) {
+                        decidedBot = bot;
+                        decisionType = 'CHALLENGE';
+                        break;
+                    }
+                }
+
+                if (action.type === 'FOREIGN_AID' && canPlayerBlockGeneralAction(bot, actor)) {
+                    if (botHasRole(bot, 'DUKE') ? Math.random() < 0.72 : Math.random() < profile.blockBluffRate) {
+                        decidedBot = bot;
+                        decisionType = 'BLOCK';
+                        blockRoleChoice = 'DUKE';
+                        break;
+                    }
+                } else if (action.type === 'EMBEZZLE' && canPlayerBlockGeneralAction(bot, actor)) {
+                    if (botHasRole(bot, 'DUKE') ? Math.random() < 0.85 : Math.random() < profile.blockBluffRate * 0.7) {
+                        decidedBot = bot;
+                        decisionType = 'BLOCK';
+                        blockRoleChoice = 'DUKE';
+                        break;
+                    }
+                } else if (action.type === 'ASSASSINATE' && canPlayerProtectTarget(bot, target)) {
+                    const hasContessa = botHasRole(bot, 'CONTESSA');
+                    const isSelf = target && target.id === bot.id;
+                    const blockProb = hasContessa ? 0.92 : (isSelf ? Math.max(0.35, profile.blockBluffRate) : profile.blockBluffRate * 0.6);
+                    if (Math.random() < blockProb) {
+                        decidedBot = bot;
+                        decisionType = 'BLOCK';
+                        blockRoleChoice = 'CONTESSA';
+                        break;
+                    }
+                } else if (action.type === 'STEAL' && canPlayerProtectTarget(bot, target)) {
+                    const hasCap = botHasRole(bot, 'CAPTAIN');
+                    const hasAmb = botHasRole(bot, 'AMBASSADOR');
+                    const isSelf = target && target.id === bot.id;
+                    if (hasCap || hasAmb) {
+                        if (Math.random() < 0.85) {
+                            decidedBot = bot;
+                            decisionType = 'BLOCK';
+                            blockRoleChoice = hasCap ? 'CAPTAIN' : 'AMBASSADOR';
+                            break;
+                        }
+                    } else if (Math.random() < (isSelf ? profile.blockBluffRate : profile.blockBluffRate * 0.5)) {
+                        decidedBot = bot;
+                        decisionType = 'BLOCK';
+                        blockRoleChoice = Math.random() < 0.5 ? 'CAPTAIN' : 'AMBASSADOR';
+                        break;
+                    }
+                }
+            }
+
+            const reactionDelay = 1200 + Math.floor(Math.random() * 1400);
+            document.getElementById('status-message').innerText = `Aguardando reação da mesa...`;
+            startReactionWindowTimer(4.0, null);
+
+            setTimeout(() => {
+                stopReactionWindowTimer();
+                if (matchSessionId !== currentSession || gameState.phase !== 'ACTION_REACTION_WINDOW') return;
+                if (decidedBot && decisionType === 'CHALLENGE') {
+                    handleChallenge(decidedBot.id);
+                } else if (decidedBot && decisionType === 'BLOCK') {
+                    handleBlock(decidedBot.id, blockRoleChoice);
+                } else {
+                    resolvePendingAction();
+                }
+            }, reactionDelay);
+        }
+
+        function simulateBotReactionsToBlock(blocker, blockRole) {
+            const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
+            const currentSession = matchSessionId;
+            const bots = gameState.players.filter(p => !p.isHuman && p.id !== blocker.id && p.cards.some(c => !c.revealed) && canPlayerChallenge(p, blocker));
+
+            let challengerBot = null;
+            for (const bot of bots.sort(() => Math.random() - 0.5)) {
+                if (Math.random() < profile.challengeRate) {
+                    challengerBot = bot;
+                    break;
+                }
+            }
+
+            const reactionDelay = 1200 + Math.floor(Math.random() * 1300);
+            startReactionWindowTimer(4.0, null);
+            setTimeout(() => {
+                stopReactionWindowTimer();
+                if (matchSessionId !== currentSession || gameState.phase !== 'BLOCK_REACTION_WINDOW') return;
+                if (challengerBot) {
+                    handleChallenge(challengerBot.id);
+                } else {
+                    logMessage(`Bloqueio de ${blocker.name} aceito pela mesa.`, 'text-slate-400');
+                    nextTurn();
+                }
+            }, reactionDelay);
         }
 
         function renderBlockReactionButtonsForLocal(blocker, blockRole) {
@@ -3153,157 +3608,81 @@
             const btnChallengeBlock = document.createElement('button');
             btnChallengeBlock.className = 'action-btn bg-red-700 hover:bg-red-600 text-white font-bold text-xs px-3 py-2 rounded-lg border border-red-500 shadow';
             btnChallengeBlock.innerHTML = `<i class="fa-solid fa-gavel mr-1"></i> Contestar Bloqueio (${CHARACTERS[blockRole].name})!`;
-            btnChallengeBlock.onclick = () => handleChallenge(human.id);
+            btnChallengeBlock.onclick = () => {
+                stopReactionWindowTimer();
+                handleChallenge(human.id);
+            };
 
             const btnAcceptBlock = document.createElement('button');
             btnAcceptBlock.className = 'action-btn bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-500';
             btnAcceptBlock.innerText = 'Aceitar Bloqueio';
             btnAcceptBlock.onclick = () => {
                 hideReactionControls();
-                logMessage(`Bloqueio de ${blocker.name} aceito.`, 'text-slate-400');
-                nextTurn();
+                stopReactionWindowTimer();
+                if (matchConfig.mode === 'ONLINE') {
+                    recordOnlineBlockPassAndCheckResolve(blocker);
+                } else {
+                    simulateBotReactionsToBlock(blocker, blockRole);
+                }
             };
 
             container.appendChild(btnChallengeBlock);
             container.appendChild(btnAcceptBlock);
-        }
 
-        function simulateBotReactionsToAction() {
-            const currentSession = matchSessionId;
-            const action = gameState.pendingAction;
-            const actor = gameState.players.find(p => p.id === action.sourceId);
-            const target = action.targetId !== undefined ? gameState.players.find(p => p.id === action.targetId) : null;
-            const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
-
-            setTimeout(() => {
-                if (matchSessionId !== currentSession) return;
-                if (gameState.phase !== 'ACTION_REACTION_WINDOW') return;
-
-                const bots = gameState.players.filter(p => !p.isHuman && p.id !== actor.id && p.cards.some(c => !c.revealed));
-
-                if (action.claimedRole || action.type === 'EMBEZZLE') {
-                    const challengers = bots.filter(b => canPlayerChallenge(b, actor));
-                    if (challengers.length > 0 && Math.random() < profile.challengeRate) {
-                        const c = challengers[Math.floor(Math.random() * challengers.length)];
-                        handleChallenge(c.id);
-                        return;
-                    }
-                }
-
-                if (action.type === 'FOREIGN_AID') {
-                    const validBlockers = bots.filter(b => canPlayerBlockGeneralAction(b, actor));
-                    if (validBlockers.length > 0) {
-                        const honestDuke = validBlockers.find(b => botHasRole(b, 'DUKE'));
-                        if (honestDuke && Math.random() < (profile.smartTarget ? 0.75 : 0.45)) {
-                            handleBlock(honestDuke.id, 'DUKE');
-                            return;
-                        }
-                        if (Math.random() < profile.blockBluffRate) {
-                            const blocker = validBlockers[Math.floor(Math.random() * validBlockers.length)];
-                            handleBlock(blocker.id, 'DUKE');
-                            return;
-                        }
-                    }
-                }
-
-                if (action.type === 'EMBEZZLE') {
-                    const blockers = bots.filter(b => canPlayerBlockGeneralAction(b, actor));
-                    if (blockers.length > 0 && Math.random() < Math.max(0.35, profile.blockBluffRate)) {
-                        const honestDuke = blockers.find(b => botHasRole(b, 'DUKE'));
-                        const blocker = honestDuke || blockers[Math.floor(Math.random() * blockers.length)];
-                        handleBlock(blocker.id, 'DUKE');
-                        return;
-                    }
-                }
-
-                if (action.type === 'ASSASSINATE' && target) {
-                    const protectors = bots.filter(b => canPlayerProtectTarget(b, target));
-                    if (protectors.length > 0) {
-                        const honestContessa = protectors.find(b => botHasRole(b, 'CONTESSA'));
-                        if (honestContessa && Math.random() < 0.85) {
-                            handleBlock(honestContessa.id, 'CONTESSA');
-                            return;
-                        }
-                        if (Math.random() < profile.blockBluffRate) {
-                            const blocker = protectors[Math.floor(Math.random() * protectors.length)];
-                            handleBlock(blocker.id, 'CONTESSA');
-                            return;
-                        }
-                    }
-                }
-
-                if (action.type === 'STEAL' && target) {
-                    const protectors = bots.filter(b => canPlayerProtectTarget(b, target));
-                    if (protectors.length > 0) {
-                        const honestProtector = protectors.find(b => botHasRole(b, 'CAPTAIN') || botHasRole(b, 'AMBASSADOR'));
-                        if (honestProtector && Math.random() < 0.80) {
-                            const role = botHasRole(honestProtector, 'CAPTAIN') ? 'CAPTAIN' : 'AMBASSADOR';
-                            handleBlock(honestProtector.id, role);
-                            return;
-                        }
-                        if (Math.random() < profile.blockBluffRate) {
-                            const blocker = protectors[Math.floor(Math.random() * protectors.length)];
-                            handleBlock(blocker.id, 'CAPTAIN');
-                            return;
-                        }
-                    }
-                }
-
-                resolvePendingAction();
-            }, 900);
-        }
-
-        function handleBlock(blockerId, blockRole) {
-            hideReactionControls();
-            const blocker = gameState.players.find(p => p.id === blockerId);
-            gameState.pendingAction.blockerId = blockerId;
-            gameState.pendingAction.blockRole = blockRole;
-            gameState.phase = 'BLOCK_REACTION_WINDOW';
-
-            logMessage(`🛡️ ${blocker.name} BLOQUEOU alegando **${CHARACTERS[blockRole].name}**!`, 'text-purple-400 font-bold');
-            document.getElementById('status-message').innerText = `${blocker.name} bloqueou com ${CHARACTERS[blockRole].name}. Contestar bloqueio?`;
-            if (matchConfig.mode === 'ONLINE') pushOnlineState();
-
-            const human = getHumanPlayer();
-            if (!isLocalController(blocker) && human.cards.some(c => !c.revealed) && canPlayerChallenge(human, blocker)) {
-                renderBlockReactionButtonsForLocal(blocker, blockRole);
-            } else if (matchConfig.mode === 'ONLINE') {
-                document.getElementById('status-message').innerText = `Aguardando resposta ao bloqueio de ${blocker.name}...`;
-            } else {
-                const currentSession = matchSessionId;
-                const profile = DIFFICULTY_PROFILES[matchConfig.difficulty] || DIFFICULTY_PROFILES.NORMAL;
-                setTimeout(() => {
-                    if (matchSessionId !== currentSession) return;
-                    if (gameState.phase !== 'BLOCK_REACTION_WINDOW') return;
-                    const bots = gameState.players.filter(p => !p.isHuman && canPlayerChallenge(p, blocker));
-                    if (bots.length > 0 && Math.random() < profile.challengeRate) {
-                        const c = bots[Math.floor(Math.random() * bots.length)];
-                        handleChallenge(c.id);
+            startReactionWindowTimer(4.0, () => {
+                if (gameState.phase === 'BLOCK_REACTION_WINDOW') {
+                    hideReactionControls();
+                    if (matchConfig.mode === 'ONLINE') {
+                        recordOnlineBlockPassAndCheckResolve(blocker, true);
                     } else {
-                        logMessage(`A ação foi bloqueada com sucesso por ${blocker.name}.`, 'text-slate-400');
-                        nextTurn();
+                        simulateBotReactionsToBlock(blocker, blockRole);
                     }
-                }, 900);
+                }
+            });
+        }
+
+        function recordOnlineBlockPassAndCheckResolve(blocker, forceTimeoutResolve = false) {
+            const action = gameState.pendingAction;
+            if (!action || gameState.phase !== 'BLOCK_REACTION_WINDOW') return;
+            action.blockPassedUids = action.blockPassedUids || [];
+            if (!action.blockPassedUids.includes(currentUserUid)) {
+                action.blockPassedUids.push(currentUserUid);
+            }
+            const eligibleResponders = gameState.players.filter(p =>
+                p.id !== blocker.id && p.cards.some(c => !c.revealed) && canPlayerChallenge(p, blocker)
+            );
+            if (forceTimeoutResolve || action.blockPassedUids.length >= eligibleResponders.length) {
+                logMessage(`Bloqueio de ${blocker.name} aceito.`, 'text-slate-400');
+                nextTurn();
+            } else {
+                document.getElementById('status-message').innerText = `Você aceitou o bloqueio. Aguardando os demais jogadores...`;
+                pushOnlineState();
             }
         }
 
         function handleChallenge(challengerId) {
+            if (gameState.phase !== 'ACTION_REACTION_WINDOW' && gameState.phase !== 'BLOCK_REACTION_WINDOW') {
+                return;
+            }
             hideReactionControls();
+            stopReactionWindowTimer();
             const action = gameState.pendingAction;
             const challenger = gameState.players.find(p => p.id === challengerId);
             const isBlockWindow = gameState.phase === 'BLOCK_REACTION_WINDOW';
+            gameState.phase = 'CHALLENGE_RESOLVING';
 
             if (!isBlockWindow && action.type === 'EMBEZZLE') {
                 const accused = gameState.players.find(p => p.id === action.sourceId);
+                showPlayerSpeechBubble(challenger.id, `Duvido! Você TEM o Duque e não pode roubar o Asilo!`, 'CHALLENGE');
                 logMessage(`⚔️ ${challenger.name} DUVIDOU que ${accused.name} NÃO tenha o Duque!`, 'text-red-400 font-bold');
 
                 const dukeIndex = accused.cards.findIndex(c => !c.revealed && c.character === 'DUKE');
                 if (dukeIndex !== -1) {
                     logMessage(`❌ PEGO NO FLAGRA! ${accused.name} TINHA o Duque e não podia roubar o Asilo!`, 'text-rose-500 font-bold');
-                    promptLoseInfluence(accused.id, () => nextTurn());
+                    promptLoseInfluence(accused.id, () => nextTurn(), 'NEXT_TURN');
                 } else {
                     logMessage(`✅ VERDADE! ${accused.name} realmente não tinha o Duque!`, 'text-emerald-400 font-bold');
-                    promptLoseInfluence(challenger.id, () => resolvePendingAction());
+                    promptLoseInfluence(challenger.id, () => resolvePendingAction(), 'RESOLVE_ACTION');
                 }
                 return;
             }
@@ -3312,6 +3691,7 @@
             const accusedId = isBlockWindow ? action.blockerId : action.sourceId;
             const accused = gameState.players.find(p => p.id === accusedId);
 
+            showPlayerSpeechBubble(challenger.id, `Duvido! Você não tem ${CHARACTERS[claimedRole].name}!`, 'CHALLENGE');
             logMessage(`⚔️ ${challenger.name} CONTESTOU ${accused.name} (${CHARACTERS[claimedRole].name})!`, 'text-red-400 font-bold');
 
             const cardIndex = accused.cards.findIndex(c => !c.revealed && c.character === claimedRole);
@@ -3331,7 +3711,7 @@
                     } else {
                         resolvePendingAction();
                     }
-                });
+                }, isBlockWindow ? 'NEXT_TURN' : 'RESOLVE_ACTION');
             } else {
                 logMessage(`❌ BLEFE DESMASCARADO! ${accused.name} não possuía ${CHARACTERS[claimedRole].name}!`, 'text-rose-500 font-bold');
                 promptLoseInfluence(accused.id, () => {
@@ -3340,7 +3720,7 @@
                     } else {
                         nextTurn();
                     }
-                });
+                }, isBlockWindow ? 'RESOLVE_ACTION' : 'NEXT_TURN');
             }
         }
 
@@ -3570,7 +3950,7 @@
         // =========================================================
         // INFLUENCE LOSS HANDLER
         // =========================================================
-        function promptLoseInfluence(playerId, callback) {
+        function promptLoseInfluence(playerId, callback, afterStepOverride = null) {
             const player = gameState.players.find(p => p.id === playerId);
             const activeCards = player.cards.filter(c => !c.revealed);
 
@@ -3617,10 +3997,11 @@
                 });
                 modal.classList.remove('hidden');
             } else if (matchConfig.mode === 'ONLINE') {
-                const wasBlock = gameState.phase === 'BLOCK_REACTION_WINDOW';
+                const resolvedAfter = afterStepOverride || (gameState.phase === 'BLOCK_REACTION_WINDOW' ? 'RESOLVE_ACTION' : 'NEXT_TURN');
                 gameState.phase = 'LOSE_INFLUENCE_WINDOW';
                 gameState.pendingLosePlayerId = player.id;
-                gameState.pendingAfterLose = wasBlock ? 'RESOLVE_ACTION' : 'NEXT_TURN';
+                gameState.pendingAfterLose = resolvedAfter;
+                updateUI();
                 pushOnlineState();
             } else {
                 const cardToLose = activeCards[Math.floor(Math.random() * activeCards.length)];
@@ -3631,6 +4012,32 @@
                 updateUI();
                 if (callback) callback();
             }
+        }
+
+        // =========================================================
+        // HOLD-TO-PEEK HUMAN CARDS HANDLERS
+        // =========================================================
+        const btnPeekCards = document.getElementById('btn-peek-cards');
+        function setPeekCardsState(show) {
+            isPeekingMyCards = show;
+            const icon = document.getElementById('peek-cards-icon');
+            const label = document.getElementById('peek-cards-label');
+            if (icon && label) {
+                icon.className = show ? 'fa-solid fa-eye text-amber-300' : 'fa-solid fa-eye-slash';
+                label.innerText = show ? 'Mostrando Cartas...' : 'Segurar p/ Ver Cartas';
+            }
+            updateUI();
+        }
+        if (btnPeekCards) {
+            btnPeekCards.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                setPeekCardsState(true);
+            });
+            ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => {
+                btnPeekCards.addEventListener(evt, () => {
+                    if (isPeekingMyCards) setPeekCardsState(false);
+                });
+            });
         }
     </script>
 </body>
