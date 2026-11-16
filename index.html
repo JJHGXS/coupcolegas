@@ -517,549 +517,680 @@
   <!-- ======================================================================= -->
   <script>
     // -------------------------------------------------------------------------
-    // 2. CATÁLOGO DE PERSONAGENS (VISUAL VETORIAL / ICONOGRÁFICO NATIVO)
+    // 1. CONFIGURAÇÃO DO SUPABASE (MULTIPLAYER ONLINE)
+    // -------------------------------------------------------------------------
+    const DEFAULT_SUPABASE_URL = 'https://xliqrrxyvcehdxsygadw.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'sb_publishable_ACCeKcsQpcGJh49gzjrHpA_lIuBD2BJ';
+    let SUPABASE_URL = localStorage.getItem('couplegas_sb_url') || DEFAULT_SUPABASE_URL;
+    let SUPABASE_KEY = localStorage.getItem('couplegas_sb_key') || DEFAULT_SUPABASE_KEY;
+    const SUPABASE_TABLE = 'couplegas_rooms';
+
+    async function sbRequest(path, options = {}) {
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        throw new Error('MISSING_SUPABASE_KEY');
+      }
+      const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`;
+      const headers = {
+        apikey: SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        Prefer: options.method === 'POST' ? 'return=representation' : 'return=minimal'
+      };
+      if (SUPABASE_KEY.startsWith('eyJ')) {
+        headers.Authorization = `Bearer ${SUPABASE_KEY}`;
+      }
+      const res = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+
+    async function checkSupabaseConnection() {
+      const badge = document.getElementById('supabase-status-badge');
+      if (!badge) return;
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        badge.className = 'text-xs text-rose-400 flex items-center gap-1.5 font-semibold';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> Configurar Chave';
+        return;
+      }
+      try {
+        await sbRequest(`${SUPABASE_TABLE}?select=code&limit=1`);
+        badge.className = 'text-xs text-emerald-400 flex items-center gap-1.5 font-semibold';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Conectado';
+      } catch (err) {
+        badge.className = 'text-xs text-rose-400 flex items-center gap-1.5 font-semibold';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> Offline';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. DEFINIÇÃO DOS PERSONAGENS (CLÁSSICOS + EXPANSÕES)
     // -------------------------------------------------------------------------
     const ROLES = {
       duque: {
         id: 'duque',
         name: 'Duque',
-        category: 'Clássica',
-        color: '#a855f7',
+        tag: 'Clássico',
         icon: 'fa-crown',
-        actionLabel: 'Taxar (+3)',
-        actionDesc: 'Pega 3 moedas do tesouro.',
-        blockDesc: 'Bloqueia Ajuda Externa.'
+        color: 'text-purple-300',
+        bg: 'from-purple-900/90 to-slate-900',
+        border: 'border-purple-400/50',
+        badgeBg: 'bg-purple-500/20 text-purple-300',
+        actionName: 'Taxar (+3 moedas)',
+        blocksName: 'Bloqueia Ajuda Externa',
+        desc: 'Pega 3 moedas do tesouro. Também bloqueia Ajuda Externa.'
       },
       assassino: {
         id: 'assassino',
         name: 'Assassino',
-        category: 'Clássica',
-        color: '#ef4444',
-        icon: 'fa-skull',
-        actionLabel: 'Assassinar (3)',
-        actionDesc: 'Paga 3 moedas para eliminar 1 influência de um rival.',
-        blockDesc: 'Nenhum bloqueio.'
+        tag: 'Clássico',
+        icon: 'fa-skull-crossbones',
+        color: 'text-rose-300',
+        bg: 'from-rose-950/90 to-slate-900',
+        border: 'border-rose-500/50',
+        badgeBg: 'bg-rose-500/20 text-rose-300',
+        actionName: 'Assassinar (3 moedas)',
+        blocksName: 'Nenhum bloqueio',
+        desc: 'Paga 3 moedas para eliminar uma influência de um oponente.'
       },
       capitao: {
         id: 'capitao',
         name: 'Capitão',
-        category: 'Clássica',
-        color: '#3b82f6',
+        tag: 'Clássico',
         icon: 'fa-anchor',
-        actionLabel: 'Extorquir (+2)',
-        actionDesc: 'Rouba até 2 moedas de outro jogador.',
-        blockDesc: 'Bloqueia extorsão de outro Capitão.'
+        color: 'text-sky-300',
+        bg: 'from-sky-950/90 to-slate-900',
+        border: 'border-sky-400/50',
+        badgeBg: 'bg-sky-500/20 text-sky-300',
+        actionName: 'Extorquir (+2 moedas)',
+        blocksName: 'Bloqueia Extorsão',
+        desc: 'Rouba até 2 moedas de um oponente. Bloqueia extorsão.'
       },
       condessa: {
         id: 'condessa',
         name: 'Condessa',
-        category: 'Clássica',
-        color: '#ec4899',
-        icon: 'fa-shield-heart',
-        actionLabel: 'Defesa',
-        actionDesc: 'Não possui ação ativa no turno.',
-        blockDesc: 'Bloqueia o Assassino.'
+        tag: 'Clássico',
+        icon: 'fa-gem',
+        color: 'text-amber-300',
+        bg: 'from-amber-950/90 to-slate-900',
+        border: 'border-amber-400/50',
+        badgeBg: 'bg-amber-500/20 text-amber-300',
+        actionName: 'Sem ação ativa',
+        blocksName: 'Bloqueia Assassino',
+        desc: 'Protege você contra tentativas de assassinato.'
       },
       embaixador: {
         id: 'embaixador',
         name: 'Embaixador',
-        category: 'Clássica',
-        color: '#10b981',
+        tag: 'Clássico',
         icon: 'fa-scroll',
-        actionLabel: 'Trocar (2)',
-        actionDesc: 'Compra 2 cartas do baralho e escolhe quais manter.',
-        blockDesc: 'Bloqueia extorsão do Capitão.'
+        color: 'text-emerald-300',
+        bg: 'from-emerald-950/90 to-slate-900',
+        border: 'border-emerald-400/50',
+        badgeBg: 'bg-emerald-500/20 text-emerald-300',
+        actionName: 'Trocar (2 do baralho)',
+        blocksName: 'Bloqueia Extorsão',
+        desc: 'Compra 2 cartas do baralho e devolve 2. Bloqueia extorsão.'
       },
       inquisidor: {
         id: 'inquisidor',
         name: 'Inquisidor',
-        category: 'Expansão',
-        color: '#f59e0b',
+        tag: 'Expansão',
         icon: 'fa-eye',
-        actionLabel: 'Inquirir / Trocar',
-        actionDesc: 'Troca 1 carta com o baralho ou olha 1 carta de um rival e decide se ele a troca.',
-        blockDesc: 'Bloqueia extorsão do Capitão.'
+        color: 'text-orange-300',
+        bg: 'from-orange-950/90 to-slate-900',
+        border: 'border-orange-400/50',
+        badgeBg: 'bg-orange-500/20 text-orange-300',
+        actionName: 'Inquirir / Trocar 1',
+        blocksName: 'Bloqueia Extorsão',
+        desc: 'Troca 1 carta do baralho OU olha 1 carta de um oponente e decide se ele troca.'
       },
       bufao: {
         id: 'bufao',
         name: 'Bufão',
-        category: 'Expansão',
-        color: '#f472b6',
+        tag: 'Expansão',
         icon: 'fa-masks-theater',
-        actionLabel: 'Embaralhar Rival',
-        actionDesc: 'Olha 1 carta oculta de um oponente e 1 do baralho e devolve uma para cada lugar.',
-        blockDesc: 'Bloqueia extorsão do Capitão.'
+        color: 'text-fuchsia-300',
+        bg: 'from-fuchsia-950/90 to-slate-900',
+        border: 'border-fuchsia-400/50',
+        badgeBg: 'bg-fuchsia-500/20 text-fuchsia-300',
+        actionName: 'Embaralhar Corte',
+        blocksName: 'Bloqueia Extorsão',
+        desc: 'Pega 1 carta oculta de um oponente e 1 do baralho, olha ambas e devolve 1 para cada lugar.'
       },
       burocrata: {
         id: 'burocrata',
         name: 'Burocrata',
-        category: 'Expansão',
-        color: '#eab308',
-        icon: 'fa-file-signature',
-        actionLabel: 'Tributar (+2/+1)',
-        actionDesc: 'Pega 3 moedas do tesouro, fica com 2 e entrega 1 para um adversário.',
-        blockDesc: 'Bloqueia Ajuda Externa.'
+        tag: 'Expansão',
+        icon: 'fa-scale-balanced',
+        color: 'text-teal-300',
+        bg: 'from-teal-950/90 to-slate-900',
+        border: 'border-teal-400/50',
+        badgeBg: 'bg-teal-500/20 text-teal-300',
+        actionName: 'Verba (+2 e doa 1)',
+        blocksName: 'Bloqueia Ajuda Externa',
+        desc: 'Pega 3 moedas do tesouro, fica com 2 e entrega 1 moeda a qualquer adversário.'
       },
       burgues: {
         id: 'burgues',
         name: 'Burguês',
-        category: 'Expansão',
-        color: '#22c55e',
+        tag: 'Expansão',
         icon: 'fa-sack-dollar',
-        actionLabel: 'Lucrar (+4)',
-        actionDesc: 'Pega 4 moedas, mas rivais podem alegar ter o Burguês para receber 1 moeda sua.',
-        blockDesc: 'Bloqueia Ajuda Externa.'
+        color: 'text-lime-300',
+        bg: 'from-lime-950/90 to-slate-900',
+        border: 'border-lime-400/50',
+        badgeBg: 'bg-lime-500/20 text-lime-300',
+        actionName: 'Lucro (+4 moedas)',
+        blocksName: 'Bloqueia Ajuda Externa',
+        desc: 'Pega 4 moedas. Outros jogadores podem alegar ser Burguês para ganhar 1 moeda sua.'
       },
       benfeitor: {
         id: 'benfeitor',
         name: 'Benfeitor',
-        category: 'Expansão',
-        color: '#06b6d4',
+        tag: 'Expansão',
         icon: 'fa-hand-holding-heart',
-        actionLabel: 'Redistribuir (3)',
-        actionDesc: 'Tira 3 moedas do jogador mais rico e entrega ao mais pobre da mesa.',
-        blockDesc: 'Bloqueia extorsão do Capitão.'
+        color: 'text-indigo-300',
+        bg: 'from-indigo-950/90 to-slate-900',
+        border: 'border-indigo-400/50',
+        badgeBg: 'bg-indigo-500/20 text-indigo-300',
+        actionName: 'Redistribuir (3 moedas)',
+        blocksName: 'Bloqueia Extorsão',
+        desc: 'Tira até 3 moedas do jogador mais rico da mesa e entrega ao mais pobre.'
       }
     };
 
-    /**
-     * Renderiza o visual interno de uma carta revelada usando apenas HTML/CSS e ícones nativos.
-     */
-    function renderRoleCardFaceHTML(roleId, compact = false) {
-      const r = ROLES[roleId] || ROLES.duque;
-      return `
-        <div class="w-full h-full flex flex-col items-center justify-between p-2 text-center"
-             style="background: linear-gradient(160deg, ${r.color}33 0%, #0f172a 55%, #020617 100%);">
-          <span class="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/50 text-slate-300 border border-white/10">
-            ${r.category}
-          </span>
-          <div class="${compact ? 'w-8 h-8 text-sm' : 'w-11 h-11 text-lg'} rounded-full flex items-center justify-center shadow-inner border"
-               style="background-color: ${r.color}28; border-color: ${r.color}88; color: ${r.color};">
-            <i class="fa-solid ${r.icon}"></i>
-          </div>
-          <div class="w-full">
-            <div class="${compact ? 'text-[10px]' : 'text-xs'} font-extrabold text-white truncate">${r.name}</div>
-            ${compact ? '' : `<div class="text-[9px] text-slate-300 truncate mt-0.5">${r.actionLabel}</div>`}
-          </div>
-        </div>
-      `;
-    }
+    const ALL_ROLE_IDS = Object.keys(ROLES);
 
     // -------------------------------------------------------------------------
     // 3. ESTADO GLOBAL DA APLICAÇÃO
     // -------------------------------------------------------------------------
     const appState = {
-      mode: 'home',
+      localPlayerId: localStorage.getItem('couplegas_uid') || ('uid_' + Math.random().toString(36).slice(2, 10)),
       nickname: localStorage.getItem('couplegas_nick') || '',
-      localPlayerId: localStorage.getItem('couplegas_uid') || ('p_' + Math.random().toString(36).slice(2, 10)),
       isMultiplayer: false,
       roomCode: null,
-      pollTimer: null,
-      clockTimer: null,
-      isPeekingCards: false,
-      isSetupModalOpen: false,
-      setupContext: 'single',
+      setupMode: 'solo', // 'solo' | 'lobby'
+      peeking: false,
       config: {
         botCount: 3,
         gameMode: 'ffa',
-        turnDuration: 30,
-        enabledRoles: ['duque', 'assassino', 'capitao', 'condessa', 'embaixador']
+        turnTime: 30,
+        activeRoles: ['duque', 'assassino', 'capitao', 'condessa', 'embaixador']
       },
       match: null
     };
-
     localStorage.setItem('couplegas_uid', appState.localPlayerId);
 
     // -------------------------------------------------------------------------
-    // 4. NOTIFICAÇÕES & NAVEGAÇÃO DE TELAS
+    // 4. UTILITÁRIOS DE UI & TOASTS
     // -------------------------------------------------------------------------
-    function showToast(msg, type = 'info') {
+    function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       if (!container) return;
-      const colors = {
-        info: 'bg-slate-900/95 border-amber-400/50 text-amber-200',
+      const styles = {
+        info: 'bg-slate-900/95 border-amber-400/60 text-amber-200',
         success: 'bg-emerald-950/95 border-emerald-400/60 text-emerald-200',
-        error: 'bg-rose-950/95 border-rose-400/60 text-rose-200'
+        error: 'bg-rose-950/95 border-rose-500/70 text-rose-200'
       };
       const el = document.createElement('div');
-      el.className = `px-4 py-3 rounded-2xl border shadow-2xl text-xs sm:text-sm font-bold text-center transition-all ${colors[type] || colors.info}`;
-      el.textContent = msg;
+      el.className = `px-4 py-3 rounded-2xl border shadow-2xl text-xs sm:text-sm font-bold text-center transition-all duration-300 ${styles[type] || styles.info}`;
+      el.textContent = message;
       container.appendChild(el);
       setTimeout(() => {
         el.style.opacity = '0';
+        el.style.transform = 'translateY(-8px)';
         setTimeout(() => el.remove(), 300);
-      }, 3400);
+      }, 3600);
     }
 
-    function switchScreen(screenName) {
-      appState.mode = screenName;
-      ['home', 'lobby', 'game'].forEach(s => {
-        const el = document.getElementById(`screen-${s}`);
-        if (el) el.classList.toggle('hidden', s !== screenName);
+    function switchScreen(screenId) {
+      ['screen-home', 'screen-lobby', 'screen-game'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', id !== `screen-${screenId}`);
       });
     }
 
-    // -------------------------------------------------------------------------
-    // 5. MOTOR DO JOGO (CRIAÇÃO DE PARTIDA, BARALHO, TURNOS E BALÕES)
-    // -------------------------------------------------------------------------
-    function buildShuffledDeck(enabledRoles) {
-      const roles = (enabledRoles && enabledRoles.length >= 3)
-        ? enabledRoles
-        : ['duque', 'assassino', 'capitao', 'condessa', 'embaixador'];
-      const deck = [];
-      roles.forEach(r => {
-        for (let i = 0; i < 3; i++) deck.push(r);
-      });
-      for (let i = deck.length - 1; i > 0; i--) {
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
+        [copy[i], copy[j]] = [copy[j], copy[i]];
       }
-      return deck;
+      return copy;
     }
 
-    function createMatchState(playersList, config) {
-      const deck = buildShuffledDeck(config.enabledRoles);
-      const players = playersList.map((p, idx) => ({
-        id: p.id,
-        name: p.name,
-        isBot: !!p.isBot,
-        coins: 2,
-        team: config.gameMode === 'teams' ? (idx % 2 === 0 ? 'A' : 'B') : null,
-        cards: [
-          { role: deck.pop(), revealed: false },
-          { role: deck.pop(), revealed: false }
-        ],
-        bubble: null
-      }));
+    // -------------------------------------------------------------------------
+    // 5. ENGINE DO JOGO (DECK, TURNOS, REAÇÕES E RESOLUÇÕES)
+    // -------------------------------------------------------------------------
+    function buildDeckFromConfig(cfg) {
+      const roles = (cfg.activeRoles && cfg.activeRoles.length >= 3)
+        ? cfg.activeRoles
+        : ['duque', 'assassino', 'capitao', 'condessa', 'embaixador'];
+      let deck = [];
+      roles.forEach(r => {
+        deck.push(r, r, r);
+      });
+      return shuffleArray(deck);
+    }
 
-      // Primeiro jogador com 2 jogadores começa com 1 moeda (regra oficial)
-      if (players.length === 2) {
-        players[0].coins = 1;
-      }
-
-      const now = Date.now();
-      const firstPlayer = players[0];
-      firstPlayer.bubble = {
-        type: 'thought',
-        text: 'Pensando na jogada...',
-        expiresAt: now + config.turnDuration * 1000
-      };
+    function createInitialMatchState(playersList, cfg) {
+      let deck = buildDeckFromConfig(cfg);
+      const players = playersList.map((p, idx) => {
+        const c1 = deck.pop();
+        const c2 = deck.pop();
+        return {
+          id: p.id,
+          name: p.name,
+          isBot: !!p.isBot,
+          team: cfg.gameMode === 'teams' ? (idx % 2 === 0 ? 'A' : 'B') : null,
+          coins: 2,
+          cards: [
+            { role: c1, eliminated: false },
+            { role: c2, eliminated: false }
+          ],
+          speech: null,
+          thought: null
+        };
+      });
 
       return {
-        config: { ...config },
+        status: 'playing',
+        config: { ...cfg },
         deck,
         players,
         turnIndex: 0,
-        phase: 'ACTION_SELECT', // ACTION_SELECT | REACTION_WINDOW | RESOLVING_LOSS | EXCHANGE | INQUISITOR_PEEK | BUFAO_SWAP | BUROCRATA_GIVE | GAME_OVER
-        deadline: now + config.turnDuration * 1000,
+        phase: 'action', // 'action' | 'reaction' | 'burgues_claim' | 'lose_card' | 'exchange' | 'bufao_swap' | 'inquisidor_peek' | 'gameover'
+        phaseDeadline: Date.now() + cfg.turnTime * 1000,
         pendingAction: null,
-        pendingLoss: null,
-        pendingSpecial: null,
-        winnerText: null
+        pendingBlock: null,
+        burguesClaims: [],
+        passedIds: [],
+        loserPrompt: null,
+        exchangeBuffer: null,
+        winnerId: null,
+        version: 1
       };
     }
 
+    function getAlivePlayers(m) {
+      return m.players.filter(p => p.cards.some(c => !c.eliminated));
+    }
+
     function isPlayerAlive(p) {
-      return p.cards.some(c => !c.revealed);
+      return p && p.cards.some(c => !c.eliminated);
     }
 
-    function getAlivePlayers(match) {
-      return match.players.filter(isPlayerAlive);
+    function areAllies(m, p1, p2) {
+      if (!m || m.config.gameMode !== 'teams') return false;
+      if (!p1 || !p2 || p1.id === p2.id) return false;
+      const alive = getAlivePlayers(m);
+      const teamsAlive = new Set(alive.map(p => p.team));
+      if (teamsAlive.size <= 1) return false; // Asilo liberado quando só sobra 1 equipe
+      return p1.team === p2.team;
     }
 
-    function checkVictoryCondition(match) {
-      const alive = getAlivePlayers(match);
-      if (alive.length <= 1) {
-        match.phase = 'GAME_OVER';
-        match.winnerText = alive[0] ? `${alive[0].name} venceu a corte!` : 'Empate na corte!';
-        return true;
+    function setPlayerBubble(m, playerId, type, text) {
+      const p = m.players.find(pl => pl.id === playerId);
+      if (!p) return;
+      if (type === 'speech') {
+        p.speech = { text, expires: Date.now() + 5000 };
+        p.thought = null;
+      } else {
+        p.thought = { text, expires: Date.now() + 4500 };
       }
-      if (match.config.gameMode === 'teams') {
-        const teamsAlive = new Set(alive.map(p => p.team));
-        if (teamsAlive.size === 1) {
-          const winTeam = [...teamsAlive][0];
-          match.phase = 'GAME_OVER';
-          match.winnerText = `Equipe ${winTeam} dominou a corte!`;
-          return true;
-        }
+    }
+
+    function checkWinCondition(m) {
+      const alive = getAlivePlayers(m);
+      if (alive.length <= 1) {
+        m.phase = 'gameover';
+        m.winnerId = alive[0] ? alive[0].id : null;
+        return true;
       }
       return false;
     }
 
-    function advanceToNextTurn(match) {
-      if (checkVictoryCondition(match)) return;
-      match.pendingAction = null;
-      match.pendingLoss = null;
-      match.pendingSpecial = null;
-
-      const total = match.players.length;
-      for (let step = 1; step <= total; step++) {
-        const nextIdx = (match.turnIndex + step) % total;
-        if (isPlayerAlive(match.players[nextIdx])) {
-          match.turnIndex = nextIdx;
+    function advanceTurn(m) {
+      if (checkWinCondition(m)) return;
+      const total = m.players.length;
+      for (let i = 1; i <= total; i++) {
+        const nextIdx = (m.turnIndex + i) % total;
+        if (isPlayerAlive(m.players[nextIdx])) {
+          m.turnIndex = nextIdx;
           break;
         }
       }
+      m.phase = 'action';
+      m.pendingAction = null;
+      m.pendingBlock = null;
+      m.burguesClaims = [];
+      m.passedIds = [];
+      m.loserPrompt = null;
+      m.exchangeBuffer = null;
+      m.phaseDeadline = Date.now() + m.config.turnTime * 1000;
+    }
 
-      match.phase = 'ACTION_SELECT';
-      const now = Date.now();
-      match.deadline = now + match.config.turnDuration * 1000;
-
-      match.players.forEach((p, idx) => {
-        if (idx === match.turnIndex) {
-          p.bubble = {
-            type: 'thought',
-            text: 'Pensando na jogada...',
-            expiresAt: match.deadline
-          };
-        } else if (p.bubble && p.bubble.expiresAt < now) {
-          p.bubble = null;
+    function requestLoseCard(m, targetId, reason, afterCallbackType = 'next_turn') {
+      const target = m.players.find(p => p.id === targetId);
+      if (!target || !isPlayerAlive(target)) {
+        if (afterCallbackType === 'resolve_action') {
+          executeApprovedAction(m);
+        } else {
+          advanceTurn(m);
         }
-      });
-    }
-
-    function setPlayerSpeech(match, playerId, text, durationMs = 4500) {
-      const p = match.players.find(pl => pl.id === playerId);
-      if (!p) return;
-      p.bubble = {
-        type: 'speech',
-        text,
-        expiresAt: Date.now() + durationMs
-      };
-    }
-
-    function returnCardAndDraw(match, player, cardIndex) {
-      const oldRole = player.cards[cardIndex].role;
-      match.deck.push(oldRole);
-      for (let i = match.deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [match.deck[i], match.deck[j]] = [match.deck[j], match.deck[i]];
+        return;
       }
-      player.cards[cardIndex].role = match.deck.pop();
-    }
+      const aliveIndices = target.cards
+        .map((c, idx) => (!c.eliminated ? idx : -1))
+        .filter(idx => idx !== -1);
 
-    // -------------------------------------------------------------------------
-    // 6. AÇÕES, REAÇÕES (4 SEGUNDOS), CONTESTAÇÕES E PODERES DE EXPANSÃO
-    // -------------------------------------------------------------------------
-    const ACTION_DEFS = {
-      renda: { id: 'renda', name: 'Renda (+1)', role: null, cost: 0, needsTarget: false, contestable: false, blockRoles: [] },
-      ajuda_externa: { id: 'ajuda_externa', name: 'Ajuda Externa (+2)', role: null, cost: 0, needsTarget: false, contestable: false, blockRoles: ['duque', 'burocrata', 'burgues'] },
-      golpe: { id: 'golpe', name: 'Golpe de Estado (7)', role: null, cost: 7, needsTarget: true, contestable: false, blockRoles: [] },
-      duque: { id: 'duque', name: 'Duque: Taxar (+3)', role: 'duque', cost: 0, needsTarget: false, contestable: true, blockRoles: [] },
-      assassino: { id: 'assassino', name: 'Assassino: Matar (3)', role: 'assassino', cost: 3, needsTarget: true, contestable: true, blockRoles: ['condessa'] },
-      capitao: { id: 'capitao', name: 'Capitão: Extorquir (+2)', role: 'capitao', cost: 0, needsTarget: true, contestable: true, blockRoles: ['capitao', 'embaixador', 'inquisidor', 'bufao', 'benfeitor'] },
-      embaixador: { id: 'embaixador', name: 'Embaixador: Trocar', role: 'embaixador', cost: 0, needsTarget: false, contestable: true, blockRoles: [] },
-      inquisidor: { id: 'inquisidor', name: 'Inquisidor: Inquirir', role: 'inquisidor', cost: 0, needsTarget: false, contestable: true, blockRoles: [] },
-      bufao: { id: 'bufao', name: 'Bufão: Embaralhar', role: 'bufao', cost: 0, needsTarget: true, contestable: true, blockRoles: [] },
-      burocrata: { id: 'burocrata', name: 'Burocrata: Tributar', role: 'burocrata', cost: 0, needsTarget: true, contestable: true, blockRoles: [] },
-      burgues: { id: 'burgues', name: 'Burguês: Lucrar (+4)', role: 'burgues', cost: 0, needsTarget: false, contestable: true, blockRoles: [] },
-      benfeitor: { id: 'benfeitor', name: 'Benfeitor: Redistribuir', role: 'benfeitor', cost: 0, needsTarget: false, contestable: true, blockRoles: [] }
-    };
-
-    async function declareAction(actionId, targetId = null) {
-      const match = appState.match;
-      if (!match || match.phase !== 'ACTION_SELECT') return;
-      const actor = match.players[match.turnIndex];
-      const def = ACTION_DEFS[actionId];
-      if (!def || actor.coins < def.cost) return;
-
-      if (actor.coins >= 10 && actionId !== 'golpe') {
-        showToast('Com 10 ou mais moedas, você é obrigado a dar um Golpe de Estado!', 'error');
+      if (aliveIndices.length === 1) {
+        target.cards[aliveIndices[0]].eliminated = true;
+        setPlayerBubble(m, target.id, 'speech', `Perdi ${ROLES[target.cards[aliveIndices[0]].role].name}!`);
+        if (checkWinCondition(m)) return;
+        if (afterCallbackType === 'resolve_action') {
+          executeApprovedAction(m);
+        } else {
+          advanceTurn(m);
+        }
         return;
       }
 
-      actor.coins -= def.cost;
-      const target = targetId ? match.players.find(p => p.id === targetId) : null;
-
-      const speechReasons = {
-        renda: 'Vou pegar 1 moeda de Renda.',
-        ajuda_externa: 'Peço Ajuda Externa (+2 moedas)!',
-        golpe: `Dou um Golpe de Estado em ${target?.name}!`,
-        duque: 'Sou o Duque e cobro 3 moedas de impostos!',
-        assassino: `Sou o Assassino e elimino ${target?.name}!`,
-        capitao: `Sou o Capitão e extorquo 2 moedas de ${target?.name}!`,
-        embaixador: 'Sou o Embaixador e vou trocar minhas cartas!',
-        inquisidor: 'Sou o Inquisidor e vou inspecionar a corte!',
-        bufao: `Sou o Bufão e vou misturar a carta de ${target?.name}!`,
-        burocrata: `Sou o Burocrata: fico com 2 moedas e dou 1 para ${target?.name}!`,
-        burgues: 'Sou o Burguês e lucro 4 moedas do tesouro!',
-        benfeitor: 'Sou o Benfeitor e redistribuo 3 moedas do mais rico ao mais pobre!'
+      m.phase = 'lose_card';
+      m.loserPrompt = {
+        targetId,
+        reason,
+        afterCallbackType
       };
-
-      setPlayerSpeech(match, actor.id, speechReasons[actionId] || def.name, 5000);
-
-      // Renda resolve imediatamente
-      if (actionId === 'renda') {
-        actor.coins += 1;
-        advanceToNextTurn(match);
-        await syncMatchIfNeeded();
-        return;
-      }
-
-      // Golpe de Estado vai direto para perda de influência
-      if (actionId === 'golpe' && target) {
-        triggerInfluenceLoss(match, target.id, `${actor.name} aplicou um Golpe de Estado!`, () => {
-          advanceToNextTurn(match);
-        });
-        await syncMatchIfNeeded();
-        return;
-      }
-
-      // Ações contestáveis ou bloqueáveis abrem janela rápida de 4 segundos
-      const availableBlocks = def.blockRoles.filter(r => match.config.enabledRoles.includes(r));
-      match.pendingAction = {
-        actionId,
-        actorId: actor.id,
-        targetId: target ? target.id : null,
-        claimedRole: def.role,
-        availableBlocks,
-        blockerId: null,
-        blockedWithRole: null,
-        burguesClaimants: [],
-        passedPlayerIds: [actor.id]
-      };
-      match.phase = 'REACTION_WINDOW';
-      match.deadline = Date.now() + 4000;
-      await syncMatchIfNeeded();
+      m.phaseDeadline = Date.now() + 15000;
     }
 
-    async function reactPass(playerId) {
-      const match = appState.match;
-      if (!match || match.phase !== 'REACTION_WINDOW' || !match.pendingAction) return;
-      if (!match.pendingAction.passedPlayerIds.includes(playerId)) {
-        match.pendingAction.passedPlayerIds.push(playerId);
-      }
-      const aliveOthers = getAlivePlayers(match).filter(p => !match.pendingAction.passedPlayerIds.includes(p.id));
-      if (aliveOthers.length === 0) {
-        resolvePendingActionAfterReactions(match);
-      }
-      await syncMatchIfNeeded();
-    }
+    function confirmCardLoss(m, targetId, cardIndex) {
+      if (m.phase !== 'lose_card' || !m.loserPrompt || m.loserPrompt.targetId !== targetId) return;
+      const target = m.players.find(p => p.id === targetId);
+      if (!target || !target.cards[cardIndex] || target.cards[cardIndex].eliminated) return;
 
-    async function reactBlock(blockerId, blockRole) {
-      const match = appState.match;
-      if (!match || match.phase !== 'REACTION_WINDOW' || !match.pendingAction) return;
-      const pa = match.pendingAction;
-      if (pa.blockerId) return;
+      target.cards[cardIndex].eliminated = true;
+      const afterType = m.loserPrompt.afterCallbackType;
+      m.loserPrompt = null;
 
-      const blocker = match.players.find(p => p.id === blockerId);
-      pa.blockerId = blockerId;
-      pa.blockedWithRole = blockRole;
-      pa.passedPlayerIds = [blockerId];
-
-      setPlayerSpeech(match, blockerId, `Bloqueio! Sou ${ROLES[blockRole]?.name || blockRole}!`, 4500);
-      match.deadline = Date.now() + 4000;
-      await syncMatchIfNeeded();
-    }
-
-    async function reactBurguesClaim(claimantId) {
-      const match = appState.match;
-      if (!match || match.phase !== 'REACTION_WINDOW' || !match.pendingAction) return;
-      const pa = match.pendingAction;
-      if (pa.actionId !== 'burgues' || pa.blockerId || claimantId === pa.actorId) return;
-      if (!pa.burguesClaimants.includes(claimantId)) {
-        pa.burguesClaimants.push(claimantId);
-        setPlayerSpeech(match, claimantId, 'Também sou Burguês! Quero minha 1 moeda!', 4500);
-        match.deadline = Date.now() + 4000;
-        await syncMatchIfNeeded();
-      }
-    }
-
-    async function reactChallenge(challengerId, targetClaimantId = null) {
-      const match = appState.match;
-      if (!match || match.phase !== 'REACTION_WINDOW' || !match.pendingAction) return;
-      const pa = match.pendingAction;
-
-      const accusedId = targetClaimantId || (pa.blockerId ? pa.blockerId : pa.actorId);
-      const claimedRole = pa.blockerId ? pa.blockedWithRole : pa.claimedRole;
-      if (!claimedRole || accusedId === challengerId) return;
-
-      const challenger = match.players.find(p => p.id === challengerId);
-      const accused = match.players.find(p => p.id === accusedId);
-
-      setPlayerSpeech(match, challengerId, `Duvido! ${accused.name} não tem ${ROLES[claimedRole]?.name}!`, 4500);
-
-      const matchingIdx = accused.cards.findIndex(c => !c.revealed && c.role === claimedRole);
-      if (matchingIdx !== -1) {
-        // Acusado PROVA que tinha a carta! Troca a carta no baralho e desafiante perde influência
-        returnCardAndDraw(match, accused, matchingIdx);
-        setPlayerSpeech(match, accusedId, `Eu realmente tinha ${ROLES[claimedRole]?.name}!`, 4500);
-
-        triggerInfluenceLoss(match, challengerId, `${accused.name} provou ter ${ROLES[claimedRole]?.name}!`, () => {
-          if (pa.blockerId) {
-            // Bloqueio foi verdadeiro -> ação original cancelada
-            advanceToNextTurn(match);
-          } else if (targetClaimantId && targetClaimantId !== pa.actorId) {
-            // Reivindicante do Burguês provou ter a carta -> volta para janela ou resolve
-            resolvePendingActionAfterReactions(match);
-          } else {
-            // Ação original foi provada -> executa efeito
-            executeActionEffect(match, pa);
-          }
-        });
+      if (checkWinCondition(m)) return;
+      if (afterType === 'resolve_action') {
+        executeApprovedAction(m);
       } else {
-        // Acusado BLEFOU! Perde influência e sua ação/bloqueio falha
-        setPlayerSpeech(match, accusedId, 'Fui descoberto no blefe!', 4500);
+        advanceTurn(m);
+      }
+    }
 
-        if (targetClaimantId && pa.burguesClaimants.includes(targetClaimantId)) {
-          pa.burguesClaimants = pa.burguesClaimants.filter(id => id !== targetClaimantId);
+    function playerHasRole(player, roleId) {
+      return player.cards.some(c => !c.eliminated && c.role === roleId);
+    }
+
+    function replaceRevealedCard(m, player, roleId) {
+      const idx = player.cards.findIndex(c => !c.eliminated && c.role === roleId);
+      if (idx === -1) return;
+      m.deck.push(player.cards[idx].role);
+      m.deck = shuffleArray(m.deck);
+      player.cards[idx].role = m.deck.pop();
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. DECLARAÇÃO E RESOLUÇÃO DE AÇÕES / BLOQUEIOS / CONTESTAÇÕES
+    // -------------------------------------------------------------------------
+    function declareAction(m, actorId, actionType, targetId = null, extraTargetId = null) {
+      const actor = m.players.find(p => p.id === actorId);
+      if (!actor || m.players[m.turnIndex].id !== actorId || m.phase !== 'action') return;
+
+      if (actor.coins >= 10 && actionType !== 'coup') {
+        if (actorId === appState.localPlayerId) {
+          showToast('Com 10 ou mais moedas, você é obrigado a dar um Golpe de Estado!', 'error');
         }
-
-        triggerInfluenceLoss(match, accusedId, `${accused.name} blefou sobre ter ${ROLES[claimedRole]?.name}!`, () => {
-          if (pa.blockerId) {
-            // Bloqueio era blefe -> ação original acontece!
-            pa.blockerId = null;
-            executeActionEffect(match, pa);
-          } else if (targetClaimantId && targetClaimantId !== pa.actorId) {
-            // Blefe de reivindicante do Burguês falhou -> continua resolvendo
-            resolvePendingActionAfterReactions(match);
-          } else {
-            // Ação original era blefe -> turno acaba
-            advanceToNextTurn(match);
-          }
-        });
-      }
-
-      await syncMatchIfNeeded();
-    }
-
-    function resolvePendingActionAfterReactions(match) {
-      const pa = match.pendingAction;
-      if (!pa) return;
-      if (pa.blockerId) {
-        // Bloqueio não contestado -> ação cancelada
-        advanceToNextTurn(match);
         return;
       }
-      executeActionEffect(match, pa);
+
+      const actionMap = {
+        income: { label: 'Renda (+1 moeda)', claimedRole: null, blockRoles: [] },
+        foreign_aid: { label: 'Ajuda Externa (+2 moedas)', claimedRole: null, blockRoles: ['duque', 'burocrata', 'burgues'] },
+        coup: { label: 'Golpe de Estado (-7 moedas)', claimedRole: null, blockRoles: [] },
+        duque: { label: 'Taxar como Duque (+3)', claimedRole: 'duque', blockRoles: [] },
+        assassino: { label: 'Assassinar (-3 moedas)', claimedRole: 'assassino', blockRoles: ['condessa'] },
+        capitao: { label: 'Extorquir (+2 moedas)', claimedRole: 'capitao', blockRoles: ['capitao', 'embaixador', 'inquisidor', 'bufao', 'benfeitor'] },
+        embaixador: { label: 'Trocar cartas (Embaixador)', claimedRole: 'embaixador', blockRoles: [] },
+        inquisidor_swap: { label: 'Trocar 1 carta (Inquisidor)', claimedRole: 'inquisidor', blockRoles: [] },
+        inquisidor_peek: { label: 'Inquirir oponente (Inquisidor)', claimedRole: 'inquisidor', blockRoles: [] },
+        bufao: { label: 'Embaralhar Corte (Bufão)', claimedRole: 'bufao', blockRoles: [] },
+        burocrata: { label: 'Verba do Burocrata (+2 e doa 1)', claimedRole: 'burocrata', blockRoles: [] },
+        burgues: { label: 'Lucro do Burguês (+4 moedas)', claimedRole: 'burgues', blockRoles: [] },
+        benfeitor: { label: 'Redistribuição do Benfeitor', claimedRole: 'benfeitor', blockRoles: [] }
+      };
+
+      const info = actionMap[actionType];
+      if (!info) return;
+
+      if (actionType === 'coup') {
+        if (actor.coins < 7) return;
+        actor.coins -= 7;
+        const target = m.players.find(p => p.id === targetId);
+        setPlayerBubble(m, actor.id, 'speech', `Golpe de Estado em ${target ? target.name : 'rival'}!`);
+        requestLoseCard(m, targetId, `${actor.name} aplicou um Golpe de Estado em você!`, 'next_turn');
+        return;
+      }
+
+      if (actionType === 'assassino') {
+        if (actor.coins < 3) return;
+        actor.coins -= 3;
+      }
+
+      if (actionType === 'income') {
+        actor.coins += 1;
+        setPlayerBubble(m, actor.id, 'speech', 'Peguei 1 moeda de Renda.');
+        advanceTurn(m);
+        return;
+      }
+
+      const targetObj = targetId ? m.players.find(p => p.id === targetId) : null;
+      const speechText = targetObj ? `${info.label} em ${targetObj.name}!` : `${info.label}!`;
+      setPlayerBubble(m, actor.id, 'speech', speechText);
+
+      m.pendingAction = {
+        actorId,
+        type: actionType,
+        targetId,
+        extraTargetId,
+        claimedRole: info.claimedRole,
+        blockRoles: info.blockRoles
+      };
+      m.pendingBlock = null;
+      m.burguesClaims = [];
+      m.passedIds = [actorId];
+      m.phase = 'reaction';
+      m.phaseDeadline = Date.now() + 5000;
     }
 
-    function executeActionEffect(match, pa) {
-      const actor = match.players.find(p => p.id === pa.actorId);
-      const target = pa.targetId ? match.players.find(p => p.id === pa.targetId) : null;
+    function passReaction(m, playerId) {
+      if (m.phase !== 'reaction' && m.phase !== 'burgues_claim') return;
+      if (!m.passedIds.includes(playerId)) {
+        m.passedIds.push(playerId);
+      }
+      const alive = getAlivePlayers(m);
+      if (m.passedIds.length >= alive.length) {
+        resolveCurrentReactionWindow(m);
+      }
+    }
+
+    function declareBlock(m, blockerId, blockRole) {
+      if (m.phase !== 'reaction' || !m.pendingAction || m.pendingBlock) return;
+      const blocker = m.players.find(p => p.id === blockerId);
+      if (!blocker || !isPlayerAlive(blocker)) return;
+
+      setPlayerBubble(m, blocker.id, 'speech', `Bloqueio com ${ROLES[blockRole].name}!`);
+      m.pendingBlock = {
+        blockerId,
+        role: blockRole
+      };
+      m.passedIds = [blockerId];
+      m.phaseDeadline = Date.now() + 5000;
+    }
+
+    function claimBurguesBonus(m, claimantId) {
+      if (m.phase !== 'reaction' || !m.pendingAction || m.pendingAction.type !== 'burgues') return;
+      if (claimantId === m.pendingAction.actorId) return;
+      if (m.burguesClaims.some(c => c.claimantId === claimantId)) return;
+
+      const claimant = m.players.find(p => p.id === claimantId);
+      if (!claimant || !isPlayerAlive(claimant)) return;
+
+      setPlayerBubble(m, claimant.id, 'speech', 'Também sou Burguês! Quero 1 moeda!');
+      m.burguesClaims.push({ claimantId, contested: false });
+      m.passedIds = [claimantId];
+      m.phaseDeadline = Date.now() + 4500;
+    }
+
+    function declareContest(m, challengerId) {
+      if (m.phase !== 'reaction') return;
+      const challenger = m.players.find(p => p.id === challengerId);
+      if (!challenger || !isPlayerAlive(challenger)) return;
+
+      setPlayerBubble(m, challenger.id, 'speech', 'Eu contesto! Duvido!');
+
+      // Caso 1: Contestando o último reivindicante do Burguês
+      if (m.burguesClaims.length > 0 && !m.pendingBlock) {
+        const lastClaim = m.burguesClaims[m.burguesClaims.length - 1];
+        const claimant = m.players.find(p => p.id === lastClaim.claimantId);
+        if (claimant && playerHasRole(claimant, 'burgues')) {
+          setPlayerBubble(m, claimant.id, 'speech', 'Tenho o Burguês! Mostrei e troquei.');
+          replaceRevealedCard(m, claimant, 'burgues');
+          requestLoseCard(m, challengerId, `${claimant.name} provou ter o Burguês!`, 'resolve_action');
+        } else {
+          m.burguesClaims.pop();
+          requestLoseCard(m, lastClaim.claimantId, `${challenger.name} desmascarou seu blefe de Burguês!`, 'resolve_action');
+        }
+        return;
+      }
+
+      // Caso 2: Contestando um Bloqueio
+      if (m.pendingBlock) {
+        const blocker = m.players.find(p => p.id === m.pendingBlock.blockerId);
+        const claimedRole = m.pendingBlock.role;
+        if (blocker && playerHasRole(blocker, claimedRole)) {
+          setPlayerBubble(m, blocker.id, 'speech', `Tenho ${ROLES[claimedRole].name}! Bloqueio mantido.`);
+          replaceRevealedCard(m, blocker, claimedRole);
+          requestLoseCard(m, challengerId, `${blocker.name} provou ter ${ROLES[claimedRole].name}!`, 'next_turn');
+        } else {
+          m.pendingBlock = null;
+          requestLoseCard(m, blocker.id, `${challenger.name} desmascarou o bloqueio falso!`, 'resolve_action');
+        }
+        return;
+      }
+
+      // Caso 3: Contestando a Ação Principal
+      if (m.pendingAction && m.pendingAction.claimedRole) {
+        const actor = m.players.find(p => p.id === m.pendingAction.actorId);
+        const roleId = m.pendingAction.claimedRole;
+        if (actor && playerHasRole(actor, roleId)) {
+          setPlayerBubble(m, actor.id, 'speech', `Tenho ${ROLES[roleId].name}! Ação válida!`);
+          replaceRevealedCard(m, actor, roleId);
+          requestLoseCard(m, challengerId, `${actor.name} provou ter ${ROLES[roleId].name}!`, 'resolve_action');
+        } else {
+          requestLoseCard(m, actor.id, `${challenger.name} desmascarou seu blefe de ${ROLES[roleId].name}!`, 'next_turn');
+        }
+      }
+    }
+
+    function resolveCurrentReactionWindow(m) {
+      if (m.pendingBlock) {
+        const blocker = m.players.find(p => p.id === m.pendingBlock.blockerId);
+        if (blocker) {
+          setPlayerBubble(m, blocker.id, 'speech', 'Bloqueio bem-sucedido!');
+        }
+        advanceTurn(m);
+        return;
+      }
+      executeApprovedAction(m);
+    }
+
+    function executeApprovedAction(m) {
+      const act = m.pendingAction;
+      if (!act) {
+        advanceTurn(m);
+        return;
+      }
+      const actor = m.players.find(p => p.id === act.actorId);
+      const target = act.targetId ? m.players.find(p => p.id === act.targetId) : null;
+
       if (!actor || !isPlayerAlive(actor)) {
-        advanceToNextTurn(match);
+        advanceTurn(m);
         return;
       }
 
-      switch (pa.actionId) {
-        case 'ajuda_externa':
+      switch (act.type) {
+        case 'foreign_aid':
           actor.coins += 2;
-          advanceToNextTurn(match);
+          advanceTurn(m);
           break;
 
         case 'duque':
           actor.coins += 3;
-          advanceToNextTurn(match);
+          advanceTurn(m);
           break;
+
+        case 'burocrata': {
+          actor.coins += 2;
+          let receiver = target;
+          if (!receiver || !isPlayerAlive(receiver) || receiver.id === actor.id) {
+            receiver = getAlivePlayers(m).find(p => p.id !== actor.id);
+          }
+          if (receiver) {
+            receiver.coins += 1;
+            setPlayerBubble(m, actor.id, 'speech', `+2 pra mim e +1 moeda para ${receiver.name}.`);
+          }
+          advanceTurn(m);
+          break;
+        }
+
+        case 'burgues': {
+          actor.coins += 4;
+          if (m.burguesClaims && m.burguesClaims.length > 0) {
+            m.burguesClaims.forEach(cl => {
+              const other = m.players.find(p => p.id === cl.claimantId);
+              if (other && isPlayerAlive(other) && actor.coins > 0) {
+                actor.coins -= 1;
+                other.coins += 1;
+              }
+            });
+          }
+          advanceTurn(m);
+          break;
+        }
+
+        case 'benfeitor': {
+          const alive = getAlivePlayers(m);
+          if (alive.length >= 2) {
+            const sorted = [...alive].sort((a, b) => b.coins - a.coins);
+            const richest = sorted[0];
+            const poorest = sorted[sorted.length - 1];
+            if (richest.id !== poorest.id && richest.coins > 0) {
+              const transfer = Math.min(3, richest.coins);
+              richest.coins -= transfer;
+              poorest.coins += transfer;
+              setPlayerBubble(m, actor.id, 'speech', `Transferi ${transfer} moedas de ${richest.name} para ${poorest.name}!`);
+            }
+          }
+          advanceTurn(m);
+          break;
+        }
 
         case 'assassino':
           if (target && isPlayerAlive(target)) {
-            triggerInfluenceLoss(match, target.id, `${actor.name} executou o assassinato!`, () => {
-              advanceToNextTurn(match);
-            });
+            requestLoseCard(m, target.id, `${actor.name} assassinou uma de suas influências!`, 'next_turn');
           } else {
-            advanceToNextTurn(match);
+            advanceTurn(m);
           }
           break;
 
@@ -1069,922 +1200,883 @@
             target.coins -= stolen;
             actor.coins += stolen;
           }
-          advanceToNextTurn(match);
+          advanceTurn(m);
           break;
-
-        case 'burocrata':
-          // Pega 3 moedas, fica com 2 e entrega 1 ao alvo
-          actor.coins += 2;
-          if (target && isPlayerAlive(target)) {
-            target.coins += 1;
-          }
-          advanceToNextTurn(match);
-          break;
-
-        case 'burgues': {
-          // Pega 4 moedas e paga 1 moeda para cada reivindicante não contestado
-          actor.coins += 4;
-          (pa.burguesClaimants || []).forEach(cid => {
-            const cPlayer = match.players.find(p => p.id === cid);
-            if (cPlayer && isPlayerAlive(cPlayer) && actor.coins > 0) {
-              actor.coins -= 1;
-              cPlayer.coins += 1;
-            }
-          });
-          advanceToNextTurn(match);
-          break;
-        }
-
-        case 'benfeitor': {
-          // Tira até 3 moedas do mais rico e dá ao mais pobre
-          const alive = getAlivePlayers(match);
-          if (alive.length >= 2) {
-            const sorted = [...alive].sort((a, b) => b.coins - a.coins);
-            const richest = sorted[0];
-            const poorest = sorted[sorted.length - 1];
-            if (richest.id !== poorest.id) {
-              const amount = Math.min(3, richest.coins);
-              richest.coins -= amount;
-              poorest.coins += amount;
-              setPlayerSpeech(match, actor.id, `Transferi ${amount} moedas de ${richest.name} para ${poorest.name}!`, 4500);
-            }
-          }
-          advanceToNextTurn(match);
-          break;
-        }
 
         case 'embaixador': {
-          const drawn = [match.deck.pop(), match.deck.pop()].filter(Boolean);
-          match.phase = 'EXCHANGE';
-          match.deadline = Date.now() + 25000;
-          match.pendingSpecial = {
-            type: 'embaixador',
-            playerId: actor.id,
-            drawnCards: drawn
+          const d1 = m.deck.pop();
+          const d2 = m.deck.pop();
+          const aliveCards = actor.cards
+            .map((c, idx) => (!c.eliminated ? { role: c.role, slotIdx: idx } : null))
+            .filter(Boolean);
+          const pool = [
+            ...aliveCards.map(c => ({ role: c.role, source: 'hand' })),
+            ...(d1 ? [{ role: d1, source: 'deck' }] : []),
+            ...(d2 ? [{ role: d2, source: 'deck' }] : [])
+          ];
+          m.phase = 'exchange';
+          m.exchangeBuffer = {
+            actorId: actor.id,
+            keepCount: aliveCards.length,
+            pool
           };
+          m.phaseDeadline = Date.now() + 20000;
           break;
         }
 
-        case 'inquisidor': {
-          const drawn = [match.deck.pop()].filter(Boolean);
-          match.phase = 'EXCHANGE';
-          match.deadline = Date.now() + 25000;
-          match.pendingSpecial = {
-            type: 'inquisidor',
-            playerId: actor.id,
-            drawnCards: drawn
+        case 'inquisidor_swap': {
+          const d1 = m.deck.pop();
+          const aliveCards = actor.cards
+            .map((c, idx) => (!c.eliminated ? { role: c.role, slotIdx: idx } : null))
+            .filter(Boolean);
+          const pool = [
+            ...aliveCards.map(c => ({ role: c.role, source: 'hand' })),
+            ...(d1 ? [{ role: d1, source: 'deck' }] : [])
+          ];
+          m.phase = 'exchange';
+          m.exchangeBuffer = {
+            actorId: actor.id,
+            keepCount: aliveCards.length,
+            pool
           };
+          m.phaseDeadline = Date.now() + 20000;
+          break;
+        }
+
+        case 'inquisidor_peek': {
+          if (!target || !isPlayerAlive(target)) {
+            advanceTurn(m);
+            break;
+          }
+          const targetAliveSlots = target.cards
+            .map((c, idx) => (!c.eliminated ? idx : -1))
+            .filter(idx => idx !== -1);
+          const chosenSlot = targetAliveSlots[Math.floor(Math.random() * targetAliveSlots.length)];
+          m.phase = 'inquisidor_peek';
+          m.exchangeBuffer = {
+            actorId: actor.id,
+            targetId: target.id,
+            targetSlot: chosenSlot,
+            inspectedRole: target.cards[chosenSlot].role
+          };
+          m.phaseDeadline = Date.now() + 15000;
           break;
         }
 
         case 'bufao': {
-          if (target && isPlayerAlive(target) && match.deck.length > 0) {
-            const hiddenIdx = target.cards.findIndex(c => !c.revealed);
-            if (hiddenIdx !== -1) {
-              const rivalCard = target.cards[hiddenIdx].role;
-              const deckCard = match.deck.pop();
-              match.phase = 'BUFAO_SWAP';
-              match.deadline = Date.now() + 25000;
-              match.pendingSpecial = {
-                type: 'bufao',
-                playerId: actor.id,
-                targetId: target.id,
-                targetCardIdx: hiddenIdx,
-                rivalCard,
-                deckCard
-              };
-              break;
-            }
+          if (!target || !isPlayerAlive(target) || m.deck.length === 0) {
+            advanceTurn(m);
+            break;
           }
-          advanceToNextTurn(match);
+          const targetAliveSlots = target.cards
+            .map((c, idx) => (!c.eliminated ? idx : -1))
+            .filter(idx => idx !== -1);
+          const chosenSlot = targetAliveSlots[Math.floor(Math.random() * targetAliveSlots.length)];
+          const opponentRole = target.cards[chosenSlot].role;
+          const deckRole = m.deck.pop();
+
+          m.phase = 'bufao_swap';
+          m.exchangeBuffer = {
+            actorId: actor.id,
+            targetId: target.id,
+            targetSlot: chosenSlot,
+            cards: [opponentRole, deckRole]
+          };
+          m.phaseDeadline = Date.now() + 18000;
           break;
         }
 
         default:
-          advanceToNextTurn(match);
+          advanceTurn(m);
       }
     }
 
-    function triggerInfluenceLoss(match, victimId, reason, onComplete) {
-      const victim = match.players.find(p => p.id === victimId);
-      if (!victim || !isPlayerAlive(victim)) {
-        onComplete();
-        return;
-      }
-      const unrevealedIndices = victim.cards
-        .map((c, idx) => (!c.revealed ? idx : -1))
-        .filter(idx => idx !== -1);
+    function finishExchangeSelection(m, selectedIndices) {
+      if (m.phase !== 'exchange' || !m.exchangeBuffer) return;
+      const buf = m.exchangeBuffer;
+      const actor = m.players.find(p => p.id === buf.actorId);
+      if (!actor) return;
 
-      if (unrevealedIndices.length === 1) {
-        victim.cards[unrevealedIndices[0]].revealed = true;
-        onComplete();
-        return;
-      }
+      const keptRoles = selectedIndices.map(i => buf.pool[i].role);
+      const returnedRoles = buf.pool
+        .filter((_, i) => !selectedIndices.includes(i))
+        .map(item => item.role);
 
-      // Armazena callback serializável via tipo de continuação
-      match.phase = 'RESOLVING_LOSS';
-      match.deadline = Date.now() + 20000;
-      match.pendingLoss = {
-        victimId,
-        reason,
-        resumeAction: match.pendingAction ? { ...match.pendingAction } : null,
-        executeAfterLoss: reason.includes('provou') && !match.pendingAction?.blockerId
-      };
-      match._afterLossCallback = onComplete;
+      let k = 0;
+      actor.cards.forEach(c => {
+        if (!c.eliminated && k < keptRoles.length) {
+          c.role = keptRoles[k++];
+        }
+      });
+      m.deck.push(...returnedRoles);
+      m.deck = shuffleArray(m.deck);
+      advanceTurn(m);
     }
 
-    async function confirmInfluenceLoss(victimId, cardIndex) {
-      const match = appState.match;
-      if (!match || match.phase !== 'RESOLVING_LOSS' || !match.pendingLoss) return;
-      if (match.pendingLoss.victimId !== victimId) return;
-
-      const victim = match.players.find(p => p.id === victimId);
-      if (!victim || victim.cards[cardIndex]?.revealed) return;
-
-      victim.cards[cardIndex].revealed = true;
-      const lossInfo = match.pendingLoss;
-      match.pendingLoss = null;
-
-      if (typeof match._afterLossCallback === 'function') {
-        const cb = match._afterLossCallback;
-        match._afterLossCallback = null;
-        cb();
-      } else if (lossInfo.executeAfterLoss && lossInfo.resumeAction) {
-        executeActionEffect(match, lossInfo.resumeAction);
-      } else {
-        advanceToNextTurn(match);
+    function finishInquisidorPeek(m, forceSwap) {
+      if (m.phase !== 'inquisidor_peek' || !m.exchangeBuffer) return;
+      const buf = m.exchangeBuffer;
+      const target = m.players.find(p => p.id === buf.targetId);
+      if (target && forceSwap && m.deck.length > 0) {
+        const oldRole = target.cards[buf.targetSlot].role;
+        target.cards[buf.targetSlot].role = m.deck.pop();
+        m.deck.push(oldRole);
+        m.deck = shuffleArray(m.deck);
+        setPlayerBubble(m, buf.actorId, 'speech', `Obriguei ${target.name} a trocar a carta!`);
+      } else if (target) {
+        setPlayerBubble(m, buf.actorId, 'speech', `Deixei ${target.name} manter a carta.`);
       }
+      advanceTurn(m);
+    }
 
-      await syncMatchIfNeeded();
+    function finishBufaoSwap(m, giveIndexToOpponent) {
+      if (m.phase !== 'bufao_swap' || !m.exchangeBuffer) return;
+      const buf = m.exchangeBuffer;
+      const target = m.players.find(p => p.id === buf.targetId);
+      const returnDeckIndex = giveIndexToOpponent === 0 ? 1 : 0;
+
+      if (target && !target.cards[buf.targetSlot].eliminated) {
+        target.cards[buf.targetSlot].role = buf.cards[giveIndexToOpponent];
+      }
+      m.deck.push(buf.cards[returnDeckIndex]);
+      m.deck = shuffleArray(m.deck);
+      setPlayerBubble(m, buf.actorId, 'speech', `Confundi a mão de ${target ? target.name : 'um rival'}!`);
+      advanceTurn(m);
     }
 
     // -------------------------------------------------------------------------
-    // 7. INTELIGÊNCIA ARTIFICIAL DOS BOTS (MODO SOLO)
+    // 7. INTELIGÊNCIA ARTIFICIAL DOS BOTS
     // -------------------------------------------------------------------------
-    let botActionTimeout = null;
+    let botDecisionTimer = null;
 
     function scheduleBotLogicIfNeeded() {
-      if (appState.isMultiplayer || !appState.match) return;
-      const match = appState.match;
-      if (match.phase === 'GAME_OVER') return;
+      if (botDecisionTimer) clearTimeout(botDecisionTimer);
+      const m = appState.match;
+      if (!m || m.status !== 'playing' || m.phase === 'gameover') return;
+      if (appState.isMultiplayer && !isLocalHost()) return;
 
-      if (botActionTimeout) {
-        clearTimeout(botActionTimeout);
-        botActionTimeout = null;
-      }
-
-      // 1) Bot precisa escolher ação no turno dele
-      if (match.phase === 'ACTION_SELECT') {
-        const actor = match.players[match.turnIndex];
-        if (actor && actor.isBot) {
-          botActionTimeout = setTimeout(() => {
-            if (!appState.match || appState.match.phase !== 'ACTION_SELECT') return;
-            runBotTurnAction(appState.match, actor);
+      // Turno de ação de um Bot
+      if (m.phase === 'action') {
+        const current = m.players[m.turnIndex];
+        if (current && current.isBot) {
+          setPlayerBubble(m, current.id, 'thought', 'Analisando a mesa...');
+          renderGame();
+          botDecisionTimer = setTimeout(() => {
+            if (!appState.match || appState.match.phase !== 'action') return;
+            runBotTurnAction(appState.match, current);
+            syncOrRender();
           }, 1600 + Math.random() * 1200);
         }
+        return;
       }
 
-      // 2) Bots avaliam reação na janela de 4s
-      if (match.phase === 'REACTION_WINDOW' && match.pendingAction) {
-        const pa = match.pendingAction;
-        const pendingBots = getAlivePlayers(match).filter(
-          p => p.isBot && !pa.passedPlayerIds.includes(p.id)
-        );
+      // Janela de Reação (Bots podem contestar, bloquear ou passar)
+      if (m.phase === 'reaction') {
+        const pendingBots = getAlivePlayers(m).filter(p => p.isBot && !m.passedIds.includes(p.id));
         if (pendingBots.length > 0) {
-          botActionTimeout = setTimeout(() => {
-            if (!appState.match || appState.match.phase !== 'REACTION_WINDOW') return;
-            runBotReaction(appState.match, pendingBots[0]);
+          const bot = pendingBots[0];
+          botDecisionTimer = setTimeout(() => {
+            if (!appState.match || appState.match.phase !== 'reaction') return;
+            runBotReaction(appState.match, bot);
+            syncOrRender();
           }, 900 + Math.random() * 900);
         }
+        return;
       }
 
-      // 3) Bot precisa escolher carta para perder
-      if (match.phase === 'RESOLVING_LOSS' && match.pendingLoss) {
-        const victim = match.players.find(p => p.id === match.pendingLoss.victimId);
-        if (victim && victim.isBot) {
-          botActionTimeout = setTimeout(() => {
-            const idx = victim.cards.findIndex(c => !c.revealed);
-            if (idx !== -1) confirmInfluenceLoss(victim.id, idx);
-          }, 1000);
+      // Bot precisa escolher qual carta perder
+      if (m.phase === 'lose_card' && m.loserPrompt) {
+        const target = m.players.find(p => p.id === m.loserPrompt.targetId);
+        if (target && target.isBot) {
+          botDecisionTimer = setTimeout(() => {
+            if (!appState.match || appState.match.phase !== 'lose_card') return;
+            const aliveIdx = target.cards.findIndex(c => !c.eliminated);
+            if (aliveIdx !== -1) confirmCardLoss(appState.match, target.id, aliveIdx);
+            syncOrRender();
+          }, 1200);
         }
+        return;
       }
 
-      // 4) Bot resolve Embaixador/Inquisidor ou Bufão
-      if ((match.phase === 'EXCHANGE' || match.phase === 'BUFAO_SWAP') && match.pendingSpecial) {
-        const sp = match.pendingSpecial;
-        const bot = match.players.find(p => p.id === sp.playerId);
-        if (bot && bot.isBot) {
-          botActionTimeout = setTimeout(() => {
-            if (match.phase === 'EXCHANGE') {
-              (sp.drawnCards || []).forEach(c => match.deck.push(c));
-              advanceToNextTurn(match);
-              syncMatchIfNeeded();
-            } else if (match.phase === 'BUFAO_SWAP') {
-              match.deck.push(sp.deckCard);
-              advanceToNextTurn(match);
-              syncMatchIfNeeded();
+      // Bot resolvendo Embaixador / Inquisidor / Bufão
+      if ((m.phase === 'exchange' || m.phase === 'inquisidor_peek' || m.phase === 'bufao_swap') && m.exchangeBuffer) {
+        const actor = m.players.find(p => p.id === m.exchangeBuffer.actorId);
+        if (actor && actor.isBot) {
+          botDecisionTimer = setTimeout(() => {
+            if (!appState.match) return;
+            if (m.phase === 'exchange') {
+              const indices = Array.from({ length: m.exchangeBuffer.keepCount }, (_, i) => i);
+              finishExchangeSelection(m, indices);
+            } else if (m.phase === 'inquisidor_peek') {
+              finishInquisidorPeek(m, Math.random() > 0.45);
+            } else if (m.phase === 'bufao_swap') {
+              finishBufaoSwap(m, Math.random() > 0.5 ? 1 : 0);
             }
-          }, 1100);
+            syncOrRender();
+          }, 1300);
         }
       }
     }
 
-    function runBotTurnAction(match, bot) {
-      const validTargets = getAlivePlayers(match).filter(
-        p => p.id !== bot.id && (!bot.team || p.team !== bot.team)
-      );
-      const randomTarget = validTargets[Math.floor(Math.random() * validTargets.length)];
+    function runBotTurnAction(m, bot) {
+      const enemies = getAlivePlayers(m).filter(p => p.id !== bot.id && !areAllies(m, bot, p));
+      const pickRandomEnemy = () => enemies[Math.floor(Math.random() * enemies.length)];
+      const activeRoles = m.config.activeRoles || [];
 
-      if (bot.coins >= 7 && randomTarget) {
-        declareAction('golpe', randomTarget.id);
+      if (bot.coins >= 7 && enemies.length > 0) {
+        const target = enemies.sort((a, b) => a.cards.filter(c => !c.eliminated).length - b.cards.filter(c => !c.eliminated).length)[0];
+        declareAction(m, bot.id, 'coup', target.id);
         return;
       }
 
-      const enabled = match.config.enabledRoles;
-      const myRoles = bot.cards.filter(c => !c.revealed).map(c => c.role);
-      const candidates = ['renda', 'ajuda_externa'];
-
-      myRoles.forEach(r => {
-        if (r === 'assassino' && bot.coins < 3) return;
-        if (ACTION_DEFS[r]) candidates.push(r);
-      });
-
-      // Pequena chance de blefe estratégico
-      if (Math.random() < 0.35) {
-        const bluffable = enabled.filter(r => r !== 'condessa' && (r !== 'assassino' || bot.coins >= 3));
-        if (bluffable.length > 0) {
-          candidates.push(bluffable[Math.floor(Math.random() * bluffable.length)]);
-        }
+      if (bot.coins >= 3 && activeRoles.includes('assassino') && (playerHasRole(bot, 'assassino') || Math.random() < 0.28) && enemies.length > 0) {
+        declareAction(m, bot.id, 'assassino', pickRandomEnemy().id);
+        return;
       }
 
-      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      const def = ACTION_DEFS[chosen];
-      if (def.needsTarget && !randomTarget) {
-        declareAction('renda');
+      if (activeRoles.includes('burgues') && (playerHasRole(bot, 'burgues') || Math.random() < 0.35)) {
+        declareAction(m, bot.id, 'burgues');
+        return;
+      }
+      if (activeRoles.includes('duque') && (playerHasRole(bot, 'duque') || Math.random() < 0.35)) {
+        declareAction(m, bot.id, 'duque');
+        return;
+      }
+      if (activeRoles.includes('burocrata') && (playerHasRole(bot, 'burocrata') || Math.random() < 0.35) && enemies.length > 0) {
+        declareAction(m, bot.id, 'burocrata', pickRandomEnemy().id);
+        return;
+      }
+      if (activeRoles.includes('capitao') && (playerHasRole(bot, 'capitao') || Math.random() < 0.3)) {
+        const richEnemy = enemies.filter(e => e.coins >= 2)[0];
+        if (richEnemy) {
+          declareAction(m, bot.id, 'capitao', richEnemy.id);
+          return;
+        }
+      }
+      if (activeRoles.includes('benfeitor') && (playerHasRole(bot, 'benfeitor') || Math.random() < 0.25)) {
+        declareAction(m, bot.id, 'benfeitor');
+        return;
+      }
+      if (activeRoles.includes('bufao') && (playerHasRole(bot, 'bufao') || Math.random() < 0.25) && enemies.length > 0) {
+        declareAction(m, bot.id, 'bufao', pickRandomEnemy().id);
+        return;
+      }
+
+      if (Math.random() < 0.55) {
+        declareAction(m, bot.id, 'foreign_aid');
       } else {
-        declareAction(chosen, def.needsTarget ? randomTarget.id : null);
+        declareAction(m, bot.id, 'income');
       }
     }
 
-    function runBotReaction(match, bot) {
-      const pa = match.pendingAction;
-      if (!pa) return;
-
-      // Aliados da mesma equipe não contestam nem bloqueiam entre si
-      const actor = match.players.find(p => p.id === pa.actorId);
-      if (bot.team && actor && bot.team === actor.team && !pa.blockerId) {
-        reactPass(bot.id);
+    function runBotReaction(m, bot) {
+      const act = m.pendingAction;
+      if (!act) {
+        passReaction(m, bot.id);
         return;
       }
 
-      // Se bot é o alvo de Assassino ou Capitão, tenta bloquear se tiver a carta (ou blefa 25%)
-      if (!pa.blockerId && pa.targetId === bot.id && pa.availableBlocks.length > 0) {
-        const realBlock = pa.availableBlocks.find(r => bot.cards.some(c => !c.revealed && c.role === r));
+      // Se o bot é o alvo de uma ação bloqueável e possui a carta de bloqueio
+      if (!m.pendingBlock && act.targetId === bot.id && act.blockRoles && act.blockRoles.length > 0) {
+        const realBlock = act.blockRoles.find(r => playerHasRole(bot, r));
         if (realBlock) {
-          reactBlock(bot.id, realBlock);
+          declareBlock(m, bot.id, realBlock);
           return;
         }
-        if (Math.random() < 0.25) {
-          const bluffRole = pa.availableBlocks[Math.floor(Math.random() * pa.availableBlocks.length)];
-          reactBlock(bot.id, bluffRole);
-          return;
-        }
-      }
-
-      // Reivindicar Burguês se tiver ou blefar
-      if (!pa.blockerId && pa.actionId === 'burgues' && pa.actorId !== bot.id && !pa.burguesClaimants.includes(bot.id)) {
-        const hasBurgues = bot.cards.some(c => !c.revealed && c.role === 'burgues');
-        if (hasBurgues || Math.random() < 0.2) {
-          reactBurguesClaim(bot.id);
+        if (act.type === 'assassino' && bot.cards.filter(c => !c.eliminated).length === 1 && Math.random() < 0.45) {
+          declareBlock(m, bot.id, 'condessa');
           return;
         }
       }
 
-      // Chance moderada de contestar
-      const claimRole = pa.blockerId ? pa.blockedWithRole : pa.claimedRole;
-      if (claimRole && Math.random() < 0.22) {
-        reactChallenge(bot.id);
+      // Chance pequena de contestar blefes
+      if (!m.pendingBlock && act.claimedRole && act.actorId !== bot.id && !areAllies(m, bot, m.players.find(p => p.id === act.actorId))) {
+        if (Math.random() < 0.14) {
+          declareContest(m, bot.id);
+          return;
+        }
+      }
+
+      // Reivindicar Burguês se tiver a carta
+      if (!m.pendingBlock && act.type === 'burgues' && act.actorId !== bot.id && playerHasRole(bot, 'burgues')) {
+        claimBurguesBonus(m, bot.id);
         return;
       }
 
-      reactPass(bot.id);
+      passReaction(m, bot.id);
     }
 
     // -------------------------------------------------------------------------
-    // 8. RENDERIZAÇÃO DA MESA, CARTAS OCULTAS/SEGURAR P/ VER E BALÕES
+    // 8. RENDERIZAÇÃO DA MESA, CARTAS E MODAIS
     // -------------------------------------------------------------------------
-    function renderGame() {
-      const match = appState.match;
-      if (!match) return;
+    function renderCardVisual(roleId, revealed = true, eliminated = false) {
+      const role = ROLES[roleId] || ROLES.duque;
+      if (!revealed && !eliminated) {
+        return `
+          <div class="card-frame w-24 h-34 sm:w-28 sm:h-40 rounded-2xl border-2 border-amber-400/50 card-back-classic shadow-xl flex flex-col items-center justify-center p-2 text-center">
+            <div class="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-400/40 flex items-center justify-center mb-1.5">
+              <i class="fa-solid fa-crown text-amber-400 text-base"></i>
+            </div>
+            <span class="font-royal text-[10px] font-black tracking-widest text-amber-300/90 uppercase">COUPLEGAS</span>
+            <span class="text-[9px] text-slate-400 mt-0.5">Oculta</span>
+          </div>
+        `;
+      }
 
-      const localPlayer = match.players.find(p => p.id === appState.localPlayerId) || match.players[0];
-      const activePlayer = match.players[match.turnIndex];
+      return `
+        <div class="card-frame relative w-24 h-34 sm:w-28 sm:h-40 rounded-2xl border-2 ${eliminated ? 'border-rose-600/70 grayscale opacity-60' : role.border} bg-gradient-to-b ${role.bg} shadow-xl p-2.5 flex flex-col justify-between overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${role.badgeBg}">${role.tag}</span>
+            <i class="fa-solid ${role.icon} ${role.color} text-sm"></i>
+          </div>
+          <div class="my-auto text-center">
+            <div class="w-10 h-10 mx-auto rounded-xl bg-slate-950/60 border border-white/10 flex items-center justify-center mb-1.5">
+              <i class="fa-solid ${role.icon} ${role.color} text-lg"></i>
+            </div>
+            <div class="font-extrabold text-xs sm:text-sm text-white leading-tight">${role.name}</div>
+          </div>
+          <div class="text-[9px] leading-tight text-slate-300 text-center line-clamp-2">
+            ${role.actionName}
+          </div>
+          ${eliminated ? `
+            <div class="absolute inset-0 bg-rose-950/55 flex items-center justify-center">
+              <span class="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider -rotate-12 shadow">Eliminada</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderGame() {
+      const m = appState.match;
+      if (!m) return;
+
+      const localPlayer = m.players.find(p => p.id === appState.localPlayerId) || m.players[0];
+      const activePlayer = m.players[m.turnIndex];
 
       // Cabeçalho
       document.getElementById('game-room-badge').textContent = appState.isMultiplayer
         ? `SALA ${appState.roomCode}`
-        : 'SOLO VS BOTS';
+        : 'MODO SOLO';
 
-      const canHostRestart = !appState.isMultiplayer || isLocalHost();
-      document.getElementById('btn-host-restart').classList.toggle('hidden', !canHostRestart);
-
-      // Banner Central
-      const bannerText = document.getElementById('turn-banner-text');
-      const subText = document.getElementById('turn-subtext');
-      const phaseLbl = document.getElementById('central-phase-label');
-      document.getElementById('deck-count-label').textContent = match.deck.length;
-
-      if (match.phase === 'GAME_OVER') {
-        bannerText.textContent = match.winnerText || 'Fim de Jogo!';
-        subText.textContent = canHostRestart ? 'Clique em Reiniciar no topo para jogar novamente.' : 'Aguardando o anfitrião reiniciar.';
-        phaseLbl.textContent = 'Vitória';
-      } else if (match.phase === 'REACTION_WINDOW') {
-        bannerText.textContent = 'Janela de Reação (4s)!';
-        subText.textContent = 'Conteste blefes ou bloqueie antes que o tempo acabe.';
-        phaseLbl.textContent = 'Reação';
-      } else if (match.phase === 'RESOLVING_LOSS') {
-        const victim = match.players.find(p => p.id === match.pendingLoss?.victimId);
-        bannerText.textContent = `${victim?.name || 'Jogador'} perde 1 influência!`;
-        subText.textContent = match.pendingLoss?.reason || 'Escolha uma carta para revelar.';
-        phaseLbl.textContent = 'Perda';
-      } else {
-        bannerText.textContent = `Turno de ${activePlayer?.name || ''}`;
-        subText.textContent = activePlayer?.id === localPlayer.id
-          ? 'Sua vez! Escolha uma ação abaixo.'
-          : `${activePlayer?.name} está decidindo a jogada...`;
-        phaseLbl.textContent = 'Turno';
+      const restartBtn = document.getElementById('btn-host-restart');
+      if (restartBtn) {
+        restartBtn.classList.toggle('hidden', appState.isMultiplayer && !isLocalHost());
       }
 
-      // Renderizar Oponentes (com Balões de Pensamento e Fala acima de cada assento)
-      const oppGrid = document.getElementById('opponents-grid');
-      const opponents = match.players.filter(p => p.id !== localPlayer.id);
-      oppGrid.innerHTML = opponents.map(opp => {
-        const alive = isPlayerAlive(opp);
-        const isTurn = activePlayer && activePlayer.id === opp.id && match.phase !== 'GAME_OVER';
+      // Oponentes
+      const opponentsGrid = document.getElementById('opponents-grid');
+      const opponents = m.players.filter(p => p.id !== localPlayer.id);
+      opponentsGrid.innerHTML = opponents.map(op => {
+        const isTurn = activePlayer && activePlayer.id === op.id;
+        const alive = isPlayerAlive(op);
         const now = Date.now();
-        const showBubble = opp.bubble && opp.bubble.expiresAt > now;
-
-        let bubbleHTML = '';
-        if (showBubble) {
-          if (opp.bubble.type === 'thought') {
-            const rem = Math.max(0, Math.ceil((opp.bubble.expiresAt - now) / 1000));
-            bubbleHTML = `
-              <div class="thought-tail bubble-animate mb-2 px-3 py-1.5 rounded-2xl bg-slate-800 border border-amber-400/60 text-amber-200 text-[11px] font-bold text-center shadow-xl">
-                <i class="fa-solid fa-cloud text-amber-400 mr-1"></i> ${opp.bubble.text} (${rem}s)
-              </div>
-            `;
-          } else {
-            bubbleHTML = `
-              <div class="speech-tail bubble-animate mb-2 px-3 py-1.5 rounded-2xl bg-white text-slate-950 text-[11px] font-extrabold text-center shadow-xl">
-                "${opp.bubble.text}"
-              </div>
-            `;
-          }
-        }
-
-        const cardsHTML = opp.cards.map(c => {
-          if (c.revealed) {
-            return `
-              <div class="relative w-14 h-20 sm:w-16 sm:h-24 rounded-xl overflow-hidden border border-rose-500/60 grayscale opacity-80">
-                ${renderRoleCardFaceHTML(c.role, true)}
-                <div class="absolute inset-x-0 top-0 bg-rose-900/90 text-center py-0.5">
-                  <span class="text-[7px] font-black uppercase text-rose-100">Eliminada</span>
-                </div>
-              </div>
-            `;
-          }
-          return `
-            <div class="w-14 h-20 sm:w-16 sm:h-24 rounded-xl border card-back-classic border-slate-700 flex items-center justify-center shadow">
-              <i class="fa-solid fa-crown text-amber-400/60 text-xs"></i>
-            </div>
-          `;
-        }).join('');
+        const showSpeech = op.speech && op.speech.expires > now;
+        const showThought = !showSpeech && op.thought && op.thought.expires > now;
 
         return `
-          <div class="flex flex-col justify-end">
-            ${bubbleHTML}
-            <div class="p-3 rounded-2xl bg-slate-900/90 border ${isTurn ? 'border-amber-400 shadow-lg shadow-amber-500/15' : 'border-slate-800'} ${!alive ? 'opacity-50' : ''}">
-              <div class="flex items-center justify-between gap-1 mb-2">
-                <div class="flex items-center gap-1.5 truncate">
-                  <span class="font-bold text-xs sm:text-sm text-white truncate">${opp.name}</span>
-                  ${opp.team ? `<span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Eq.${opp.team}</span>` : ''}
-                </div>
-                <span class="text-xs font-black text-amber-400 flex items-center gap-1">
-                  <i class="fa-solid fa-coins text-[10px]"></i> ${opp.coins}
-                </span>
+          <div class="relative p-3 rounded-2xl bg-slate-900/90 border-2 ${isTurn ? 'border-amber-400 shadow-lg shadow-amber-500/20' : 'border-slate-800'} ${!alive ? 'opacity-50' : ''} flex flex-col items-center text-center">
+            ${showSpeech ? `
+              <div class="speech-tail bubble-animate absolute -top-9 left-1/2 -translate-x-1/2 z-20 bg-white text-slate-950 text-[11px] font-extrabold px-3 py-1 rounded-xl shadow-xl whitespace-nowrap max-w-[210px] truncate">
+                ${op.speech.text}
               </div>
-              <div class="flex items-center justify-center gap-2">
-                ${cardsHTML}
+            ` : ''}
+            ${showThought ? `
+              <div class="thought-tail bubble-animate absolute -top-9 left-1/2 -translate-x-1/2 z-20 bg-slate-800 text-amber-200 border border-amber-400/50 text-[11px] font-semibold px-3 py-1 rounded-xl shadow-xl whitespace-nowrap">
+                <i class="fa-solid fa-comment-dots mr-1"></i> ${op.thought.text}
               </div>
+            ` : ''}
+
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="text-xs font-extrabold text-white truncate max-w-[110px]">${op.name}</span>
+              ${op.isBot ? '<i class="fa-solid fa-robot text-[10px] text-slate-400"></i>' : ''}
+              ${op.team ? `<span class="text-[9px] font-black px-1.5 py-0.2 rounded ${op.team === 'A' ? 'bg-indigo-500/30 text-indigo-300' : 'bg-rose-500/30 text-rose-300'}">Eq.${op.team}</span>` : ''}
+            </div>
+
+            <div class="text-xs font-black text-amber-400 mb-2">
+              <i class="fa-solid fa-coins mr-1"></i> ${op.coins}
+            </div>
+
+            <!-- Mini cartas do oponente -->
+            <div class="flex items-center justify-center gap-1.5">
+              ${op.cards.map(c => {
+                if (!c.eliminated) {
+                  return `<div class="w-9 h-12 rounded-lg border border-amber-400/40 card-back-classic flex items-center justify-center"><i class="fa-solid fa-crown text-[10px] text-amber-400/80"></i></div>`;
+                }
+                const r = ROLES[c.role] || ROLES.duque;
+                return `<div class="w-9 h-12 rounded-lg border border-rose-500/60 bg-rose-950/80 flex flex-col items-center justify-center px-0.5" title="Eliminada: ${r.name}">
+                  <i class="fa-solid ${r.icon} text-[10px] text-rose-300"></i>
+                  <span class="text-[7px] font-bold text-rose-200 truncate w-full text-center mt-0.5">${r.name}</span>
+                </div>`;
+              }).join('')}
             </div>
           </div>
         `;
       }).join('');
 
-      // Painel Inferior: Jogador Local
+      // Mesa Central
+      document.getElementById('deck-count-label').textContent = m.deck.length;
+
+      const phaseLabels = {
+        action: 'Ação',
+        reaction: 'Reação',
+        lose_card: 'Perda',
+        exchange: 'Troca',
+        bufao_swap: 'Bufão',
+        inquisidor_peek: 'Inquirir',
+        gameover: 'Fim'
+      };
+      document.getElementById('central-phase-label').textContent = phaseLabels[m.phase] || 'Turno';
+
+      const bannerText = document.getElementById('turn-banner-text');
+      const subText = document.getElementById('turn-subtext');
+
+      if (m.phase === 'gameover') {
+        const winner = m.players.find(p => p.id === m.winnerId);
+        bannerText.textContent = winner ? `Vitória de ${winner.name}!` : 'Partida Encerrada';
+        subText.textContent = 'Todos os oponentes foram eliminados da corte.';
+      } else {
+        bannerText.textContent = `Turno de ${activePlayer ? activePlayer.name : ''}`;
+        if (m.phase === 'action') {
+          subText.textContent = activePlayer.id === localPlayer.id
+            ? 'Sua vez! Escolha uma ação abaixo.'
+            : `Aguardando ${activePlayer.name} escolher uma jogada...`;
+        } else if (m.phase === 'reaction') {
+          subText.textContent = 'Janela de Contestação e Bloqueio aberta!';
+        } else if (m.phase === 'lose_card' && m.loserPrompt) {
+          const victim = m.players.find(p => p.id === m.loserPrompt.targetId);
+          subText.textContent = `${victim ? victim.name : 'Jogador'} está escolhendo uma influência para perder...`;
+        } else {
+          subText.textContent = 'Resolvendo efeito especial de personagem...';
+        }
+      }
+
+      // Barra de Reação (Contestar / Bloquear / Reivindicar Burguês / Passar)
+      renderReactionBar(m, localPlayer);
+
+      // Painel do Jogador Local
       document.getElementById('local-player-name').textContent = localPlayer.name;
       document.getElementById('local-player-coins').textContent = localPlayer.coins;
       const teamBadge = document.getElementById('local-team-badge');
       if (localPlayer.team) {
-        teamBadge.classList.remove('hidden');
         teamBadge.textContent = `EQUIPE ${localPlayer.team}`;
+        teamBadge.classList.remove('hidden');
       } else {
         teamBadge.classList.add('hidden');
       }
 
-      // Renderizar Cartas Locais (Posições Fixas — Nunca Embaralha ao Ocultar/Ver)
-      renderLocalCardsOnly(localPlayer);
+      // Suas cartas (ordem fixa!)
+      const cardsContainer = document.getElementById('local-cards-container');
+      cardsContainer.innerHTML = localPlayer.cards.map(c => {
+        return renderCardVisual(c.role, appState.peeking || c.eliminated, c.eliminated);
+      }).join('');
 
-      // Barra de Reação Rápida
-      renderReactionBar(match, localPlayer);
+      // Botões de Ação
+      renderActionButtons(m, localPlayer);
 
-      // Grade de Ações Disponíveis
-      renderActionButtons(match, localPlayer);
-
-      // Modais de Perda / Troca / Bufão
-      handlePhaseModals(match, localPlayer);
+      // Modais interativos (Perda de carta / Troca Embaixador / Bufão / Inquisidor)
+      handlePhaseModals(m, localPlayer);
     }
 
-    function renderLocalCardsOnly(localPlayer) {
-      const container = document.getElementById('local-cards-container');
-      if (!container) return;
-
-      // Garante exatamente 2 slots fixos no DOM para nunca trocar posição visual
-      if (container.children.length !== localPlayer.cards.length) {
-        container.innerHTML = '';
-        localPlayer.cards.forEach((_, idx) => {
-          const slot = document.createElement('div');
-          slot.dataset.slotIndex = String(idx);
-          container.appendChild(slot);
-        });
-      }
-
-      localPlayer.cards.forEach((card, idx) => {
-        const slot = container.children[idx];
-        const roleInfo = ROLES[card.role] || ROLES.duque;
-
-        if (card.revealed) {
-          slot.className = 'card-frame relative w-24 h-34 sm:w-28 sm:h-40 rounded-2xl overflow-hidden border-2 border-rose-500/60 grayscale opacity-75 shadow-lg';
-          slot.innerHTML = `
-            ${renderRoleCardFaceHTML(card.role)}
-            <div class="absolute inset-0 bg-rose-950/65 flex flex-col items-center justify-center p-1">
-              <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-900 text-rose-100">Eliminada</span>
-              <span class="text-xs font-bold text-white mt-1">${roleInfo.name}</span>
-            </div>
-          `;
-        } else if (appState.isPeekingCards) {
-          slot.className = 'card-frame relative w-24 h-34 sm:w-28 sm:h-40 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-xl';
-          slot.innerHTML = renderRoleCardFaceHTML(card.role);
-        } else {
-          slot.className = 'card-frame relative w-24 h-34 sm:w-28 sm:h-40 rounded-2xl border-2 card-back-classic border-slate-700 shadow-xl flex flex-col items-center justify-center p-2 text-center';
-          slot.innerHTML = `
-            <i class="fa-solid fa-eye-slash text-amber-400/80 text-xl mb-1.5"></i>
-            <span class="text-[11px] font-extrabold text-slate-200">Carta ${idx + 1}</span>
-            <span class="text-[9px] text-slate-400 mt-0.5">Oculta</span>
-          `;
-        }
-      });
-    }
-
-    function setPeekingState(show) {
-      if (appState.isPeekingCards === show) return;
-      appState.isPeekingCards = show;
-      const icon = document.getElementById('peek-icon');
-      const label = document.getElementById('peek-label');
-      if (icon && label) {
-        icon.className = show ? 'fa-solid fa-eye text-amber-300' : 'fa-solid fa-eye-slash';
-        label.textContent = show ? 'Mostrando Cartas...' : 'Segurar p/ Ver Cartas';
-      }
-      if (appState.match) {
-        const localPlayer = appState.match.players.find(p => p.id === appState.localPlayerId) || appState.match.players[0];
-        renderLocalCardsOnly(localPlayer);
-      }
-    }
-
-    function renderReactionBar(match, localPlayer) {
+    function renderReactionBar(m, localPlayer) {
       const bar = document.getElementById('reaction-bar');
       const title = document.getElementById('reaction-title');
       const desc = document.getElementById('reaction-desc');
       const btns = document.getElementById('reaction-buttons');
 
-      if (match.phase !== 'REACTION_WINDOW' || !match.pendingAction || !isPlayerAlive(localPlayer)) {
+      if (m.phase !== 'reaction' || !isPlayerAlive(localPlayer)) {
         bar.classList.add('hidden');
         return;
       }
 
-      const pa = match.pendingAction;
-      const actor = match.players.find(p => p.id === pa.actorId);
-      const blocker = pa.blockerId ? match.players.find(p => p.id === pa.blockerId) : null;
-      const alreadyPassed = pa.passedPlayerIds.includes(localPlayer.id);
-
-      // Se é o próprio autor (sem bloqueio) ou o próprio bloqueador, apenas aguarda
-      if ((!blocker && pa.actorId === localPlayer.id) || (blocker && blocker.id === localPlayer.id)) {
+      const alreadyPassed = m.passedIds.includes(localPlayer.id);
+      if (alreadyPassed) {
         bar.classList.remove('hidden');
-        title.textContent = 'Aguardando reações da mesa (4s)...';
-        desc.textContent = blocker
-          ? `Você bloqueou com ${ROLES[pa.blockedWithRole]?.name}.`
-          : `Você declarou ${ACTION_DEFS[pa.actionId]?.name}.`;
+        title.textContent = 'Aguardando demais jogadores...';
+        desc.textContent = 'Você já confirmou sua resposta para esta jogada.';
         btns.innerHTML = '';
         return;
       }
 
       bar.classList.remove('hidden');
-      const buttonList = [];
+      let html = '';
 
-      if (blocker) {
-        title.textContent = `${blocker.name} bloqueou com ${ROLES[pa.blockedWithRole]?.name}!`;
-        desc.textContent = 'Você pode contestar o bloqueio se achar que é blefe.';
-        if (!alreadyPassed) {
-          buttonList.push(`
-            <button type="button" onclick="reactChallenge('${localPlayer.id}')" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">
-              <i class="fa-solid fa-gavel mr-1"></i> Duvidar do Bloqueio
-            </button>
-          `);
-          buttonList.push(`
-            <button type="button" onclick="reactPass('${localPlayer.id}')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">
-              Aceitar Bloqueio
-            </button>
-          `);
+      if (m.pendingBlock) {
+        const blocker = m.players.find(p => p.id === m.pendingBlock.blockerId);
+        title.textContent = `${blocker ? blocker.name : 'Alguém'} bloqueou com ${ROLES[m.pendingBlock.role].name}!`;
+        desc.textContent = 'Você acredita no bloqueio ou deseja contestar?';
+        html += `<button type="button" onclick="onUserContest()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">Contestar Bloqueio</button>`;
+        html += `<button type="button" onclick="onUserPass()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">Aceitar</button>`;
+      } else if (m.burguesClaims && m.burguesClaims.length > 0) {
+        const lastClaim = m.burguesClaims[m.burguesClaims.length - 1];
+        const claimant = m.players.find(p => p.id === lastClaim.claimantId);
+        title.textContent = `${claimant ? claimant.name : 'Alguém'} reivindicou ser Burguês!`;
+        desc.textContent = 'Deseja contestar essa reivindicação ou aceitar?';
+        html += `<button type="button" onclick="onUserContest()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">Contestar Burguês</button>`;
+        html += `<button type="button" onclick="onUserPass()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">Aceitar</button>`;
+      } else if (m.pendingAction) {
+        const act = m.pendingAction;
+        const actor = m.players.find(p => p.id === act.actorId);
+        title.textContent = `${actor ? actor.name : 'Jogador'} declarou: ${act.type.toUpperCase()}`;
+        desc.textContent = 'Escolha como reagir antes que o tempo acabe:';
+
+        if (act.claimedRole) {
+          html += `<button type="button" onclick="onUserContest()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">Contestar (${ROLES[act.claimedRole].name})</button>`;
         }
-      } else {
-        const target = pa.targetId ? match.players.find(p => p.id === pa.targetId) : null;
-        title.textContent = `${actor?.name} declarou: ${ACTION_DEFS[pa.actionId]?.name}${target ? ' em ' + target.name : ''}`;
-        desc.textContent = alreadyPassed ? 'Você passou. Aguardando outros jogadores...' : 'Reaja rapidamente antes do tempo acabar:';
 
-        if (!alreadyPassed) {
-          // Contestar ação (se tiver personagem declarado)
-          if (pa.claimedRole) {
-            buttonList.push(`
-              <button type="button" onclick="reactChallenge('${localPlayer.id}')" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">
-                <i class="fa-solid fa-gavel mr-1"></i> Duvidar (${ROLES[pa.claimedRole]?.name})
-              </button>
-            `);
-          }
-
-          // Reivindicar Burguês (recebe 1 moeda do jogador ativo!)
-          if (pa.actionId === 'burgues' && !pa.burguesClaimants.includes(localPlayer.id)) {
-            buttonList.push(`
-              <button type="button" onclick="reactBurguesClaim('${localPlayer.id}')" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold">
-                <i class="fa-solid fa-sack-dollar mr-1"></i> Também sou Burguês (+1)
-              </button>
-            `);
-          }
-
-          // Bloqueios (Ajuda Externa qualquer um bloqueia; Assassino/Capitão o alvo bloqueia)
-          const canBlock = pa.actionId === 'ajuda_externa' || pa.targetId === localPlayer.id;
-          if (canBlock && pa.availableBlocks.length > 0) {
-            pa.availableBlocks.forEach(bRole => {
-              buttonList.push(`
-                <button type="button" onclick="reactBlock('${localPlayer.id}', '${bRole}')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold">
-                  <i class="fa-solid fa-shield mr-1"></i> Bloquear c/ ${ROLES[bRole]?.name}
-                </button>
-              `);
-            });
-          }
-
-          buttonList.push(`
-            <button type="button" onclick="reactPass('${localPlayer.id}')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">
-              Passar
-            </button>
-          `);
+        const canBlock = (act.type === 'foreign_aid') || (act.targetId === localPlayer.id && act.blockRoles.length > 0);
+        if (canBlock) {
+          const activeBlockRoles = act.blockRoles.filter(r => (m.config.activeRoles || []).includes(r));
+          const rolesToShow = activeBlockRoles.length > 0 ? activeBlockRoles : act.blockRoles;
+          rolesToShow.forEach(r => {
+            html += `<button type="button" onclick="onUserBlock('${r}')" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold">Bloquear (${ROLES[r].name})</button>`;
+          });
         }
+
+        if (act.type === 'burgues' && act.actorId !== localPlayer.id) {
+          html += `<button type="button" onclick="onUserClaimBurgues()" class="px-3.5 py-2 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 text-xs font-extrabold">Também sou Burguês (+1)</button>`;
+        }
+
+        html += `<button type="button" onclick="onUserPass()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">Passar</button>`;
       }
 
-      btns.innerHTML = buttonList.join('');
+      btns.innerHTML = html;
     }
 
-    function renderActionButtons(match, localPlayer) {
+    function renderActionButtons(m, localPlayer) {
       const grid = document.getElementById('action-buttons-grid');
-      if (!grid) return;
-
-      const isMyTurn = match.phase === 'ACTION_SELECT' &&
-        match.players[match.turnIndex]?.id === localPlayer.id &&
-        isPlayerAlive(localPlayer);
-
+      const isMyTurn = m.phase === 'action' && m.players[m.turnIndex].id === localPlayer.id && isPlayerAlive(localPlayer);
+      const activeRoles = m.config.activeRoles || [];
       const mustCoup = localPlayer.coins >= 10;
-      const enabled = match.config.enabledRoles || [];
 
-      const actionsToShow = ['renda', 'ajuda_externa', 'golpe', ...enabled.filter(r => r !== 'condessa' && ACTION_DEFS[r])];
+      const actions = [
+        { id: 'income', label: 'Renda', sub: '+1 moeda', needsTarget: false, disabled: mustCoup },
+        { id: 'foreign_aid', label: 'Ajuda Externa', sub: '+2 moedas', needsTarget: false, disabled: mustCoup },
+        { id: 'coup', label: 'Golpe de Estado', sub: '-7 moedas', needsTarget: true, disabled: localPlayer.coins < 7, highlight: mustCoup }
+      ];
 
-      grid.innerHTML = actionsToShow.map(actId => {
-        const def = ACTION_DEFS[actId];
-        if (!def) return '';
-        const disabled = !isMyTurn || localPlayer.coins < def.cost || (mustCoup && actId !== 'golpe');
-        const roleObj = def.role ? ROLES[def.role] : null;
+      if (activeRoles.includes('duque')) {
+        actions.push({ id: 'duque', label: 'Duque', sub: '+3 moedas', needsTarget: false, disabled: mustCoup });
+      }
+      if (activeRoles.includes('burocrata')) {
+        actions.push({ id: 'burocrata', label: 'Burocrata', sub: '+2 e doa 1', needsTarget: true, allowAnyOpponent: true, disabled: mustCoup });
+      }
+      if (activeRoles.includes('burgues')) {
+        actions.push({ id: 'burgues', label: 'Burguês', sub: '+4 moedas', needsTarget: false, disabled: mustCoup });
+      }
+      if (activeRoles.includes('assassino')) {
+        actions.push({ id: 'assassino', label: 'Assassino', sub: '-3 moedas', needsTarget: true, disabled: mustCoup || localPlayer.coins < 3 });
+      }
+      if (activeRoles.includes('capitao')) {
+        actions.push({ id: 'capitao', label: 'Capitão', sub: 'Rouba até 2', needsTarget: true, disabled: mustCoup });
+      }
+      if (activeRoles.includes('embaixador')) {
+        actions.push({ id: 'embaixador', label: 'Embaixador', sub: 'Troca 2 cartas', needsTarget: false, disabled: mustCoup });
+      }
+      if (activeRoles.includes('inquisidor')) {
+        actions.push({ id: 'inquisidor_swap', label: 'Inquisidor (Troca)', sub: 'Troca 1 carta', needsTarget: false, disabled: mustCoup });
+        actions.push({ id: 'inquisidor_peek', label: 'Inquisidor (Olhar)', sub: 'Olha carta rival', needsTarget: true, disabled: mustCoup });
+      }
+      if (activeRoles.includes('bufao')) {
+        actions.push({ id: 'bufao', label: 'Bufão', sub: 'Troca rival/deck', needsTarget: true, disabled: mustCoup });
+      }
+      if (activeRoles.includes('benfeitor')) {
+        actions.push({ id: 'benfeitor', label: 'Benfeitor', sub: 'Rico -> Pobre (3)', needsTarget: false, disabled: mustCoup });
+      }
 
+      grid.innerHTML = actions.map(a => {
+        const enabled = isMyTurn && !a.disabled;
         return `
-          <button type="button"
-            ${disabled ? 'disabled' : ''}
-            onclick="onClickGameAction('${actId}')"
-            class="px-3 py-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-              disabled
-                ? 'bg-slate-950/60 border-slate-800 text-slate-500 opacity-50 cursor-not-allowed'
-                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 hover:border-amber-400/60 text-white shadow'
-            }">
-            <div class="flex items-center justify-between gap-1">
-              <span class="text-xs font-extrabold truncate">${def.name}</span>
-              ${roleObj ? `<i class="fa-solid ${roleObj.icon} text-[11px]" style="color:${roleObj.color}"></i>` : ''}
-            </div>
-            <span class="text-[10px] text-slate-400 mt-0.5 truncate">${def.cost > 0 ? `Custo: ${def.cost} moedas` : 'Sem custo'}</span>
+          <button
+            type="button"
+            ${enabled ? `onclick="onUserSelectAction('${a.id}', ${a.needsTarget}, ${!!a.allowAnyOpponent})"` : 'disabled'}
+            class="p-2.5 rounded-xl border text-left transition ${
+              enabled
+                ? (a.highlight
+                    ? 'bg-rose-600/30 border-rose-400 hover:bg-rose-600/40 text-white cursor-pointer'
+                    : 'bg-slate-800/90 border-slate-700 hover:border-amber-400 hover:bg-slate-800 text-white cursor-pointer')
+                : 'bg-slate-950/60 border-slate-800/80 text-slate-500 opacity-50 cursor-not-allowed'
+            }"
+          >
+            <div class="text-xs font-extrabold truncate">${a.label}</div>
+            <div class="text-[10px] text-amber-300/90 font-semibold">${a.sub}</div>
           </button>
         `;
       }).join('');
     }
 
-    function onClickGameAction(actionId) {
-      const match = appState.match;
-      if (!match) return;
-      const def = ACTION_DEFS[actionId];
-      if (!def) return;
-
-      if (!def.needsTarget) {
-        declareAction(actionId, null);
-        return;
-      }
-
-      const localPlayer = match.players.find(p => p.id === appState.localPlayerId) || match.players[0];
-      const targets = getAlivePlayers(match).filter(
-        p => p.id !== localPlayer.id && (!localPlayer.team || p.team !== localPlayer.team)
-      );
-
-      if (targets.length === 1) {
-        declareAction(actionId, targets[0].id);
-        return;
-      }
-
-      openTargetPicker(def.name, targets, (chosenTargetId) => {
-        closeInteractionModal();
-        declareAction(actionId, chosenTargetId);
-      });
-    }
-
     // -------------------------------------------------------------------------
-    // 9. MODAIS DE ALVO, PERDA DE INFLUÊNCIA, EMBAIXADOR/INQUISIDOR E BUFÃO
+    // 9. MODAIS INTERATIVOS (ESCOLHA DE ALVO, PERDA DE CARTA E TROCAS)
     // -------------------------------------------------------------------------
-    function openInteractionModal(title, desc, iconClass, bodyHTML, footerHTML) {
-      document.getElementById('interaction-title').textContent = title;
-      document.getElementById('interaction-desc').textContent = desc;
-      document.getElementById('interaction-icon').className = `fa-solid ${iconClass}`;
-      document.getElementById('interaction-body').innerHTML = bodyHTML;
-      document.getElementById('interaction-footer').innerHTML = footerHTML;
-      document.getElementById('modal-interaction').classList.remove('hidden');
-    }
+    let activeModalSignature = '';
 
     function closeInteractionModal() {
       document.getElementById('modal-interaction').classList.add('hidden');
+      activeModalSignature = '';
     }
 
-    function openTargetPicker(actionTitle, targets, onPick) {
-      const bodyHTML = `
+    function openTargetPicker(actionId, allowAnyOpponent = false) {
+      const m = appState.match;
+      if (!m) return;
+      const localPlayer = m.players.find(p => p.id === appState.localPlayerId);
+      const validTargets = getAlivePlayers(m).filter(p => {
+        if (p.id === localPlayer.id) return false;
+        if (!allowAnyOpponent && areAllies(m, localPlayer, p)) return false;
+        return true;
+      });
+
+      if (validTargets.length === 0) {
+        showToast('Nenhum alvo válido disponível!', 'error');
+        return;
+      }
+
+      if (validTargets.length === 1) {
+        declareAction(m, localPlayer.id, actionId, validTargets[0].id);
+        syncOrRender();
+        return;
+      }
+
+      document.getElementById('interaction-icon').className = 'fa-solid fa-crosshairs';
+      document.getElementById('interaction-title').textContent = 'Escolha o Alvo';
+      document.getElementById('interaction-desc').textContent = 'Selecione qual jogador receberá esta ação:';
+      document.getElementById('interaction-body').innerHTML = `
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          ${targets.map(t => `
-            <button type="button" data-target-id="${t.id}" class="pick-target-btn p-3.5 rounded-2xl bg-slate-950 hover:bg-amber-500/15 border border-slate-700 hover:border-amber-400 text-left transition flex items-center justify-between">
+          ${validTargets.map(t => `
+            <button type="button" onclick="confirmTargetSelection('${actionId}', '${t.id}')" class="p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-left flex items-center justify-between">
               <div>
                 <div class="text-sm font-extrabold text-white">${t.name}</div>
-                <div class="text-xs text-slate-400">${t.cards.filter(c => !c.revealed).length} influência(s) ativa(s)</div>
+                <div class="text-xs text-amber-400 font-bold"><i class="fa-solid fa-coins mr-1"></i> ${t.coins} moedas</div>
               </div>
-              <span class="text-xs font-black text-amber-400"><i class="fa-solid fa-coins mr-1"></i>${t.coins}</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
             </button>
           `).join('')}
         </div>
       `;
-      const footerHTML = `<button type="button" id="btn-cancel-target" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300">Cancelar</button>`;
-      openInteractionModal(`Escolher Alvo — ${actionTitle}`, 'Selecione qual oponente sofrerá esta ação:', 'fa-crosshairs', bodyHTML, footerHTML);
-
-      document.getElementById('btn-cancel-target').onclick = closeInteractionModal;
-      document.querySelectorAll('.pick-target-btn').forEach(btn => {
-        btn.onclick = () => onPick(btn.dataset.targetId);
-      });
+      document.getElementById('interaction-footer').innerHTML = `
+        <button type="button" onclick="closeInteractionModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300">Cancelar</button>
+      `;
+      document.getElementById('modal-interaction').classList.remove('hidden');
     }
 
-    let activeModalSignature = '';
+    window.confirmTargetSelection = function(actionId, targetId) {
+      closeInteractionModal();
+      const m = appState.match;
+      if (!m) return;
+      declareAction(m, appState.localPlayerId, actionId, targetId);
+      syncOrRender();
+    };
 
-    function handlePhaseModals(match, localPlayer) {
-      // 1) Perda de influência do jogador local
-      if (match.phase === 'RESOLVING_LOSS' && match.pendingLoss?.victimId === localPlayer.id) {
-        const sig = `loss_${localPlayer.id}_${match.pendingLoss.reason}`;
+    function handlePhaseModals(m, localPlayer) {
+      const modal = document.getElementById('modal-interaction');
+
+      // 1. Perder influência
+      if (m.phase === 'lose_card' && m.loserPrompt && m.loserPrompt.targetId === localPlayer.id) {
+        const sig = `lose_${m.version}_${localPlayer.id}`;
         if (activeModalSignature === sig) return;
         activeModalSignature = sig;
 
-        const bodyHTML = `
+        document.getElementById('interaction-icon').className = 'fa-solid fa-heart-crack text-rose-400';
+        document.getElementById('interaction-title').textContent = 'Você Perdeu uma Influência!';
+        document.getElementById('interaction-desc').textContent = m.loserPrompt.reason;
+        document.getElementById('interaction-body').innerHTML = `
           <div class="flex justify-center gap-4">
             ${localPlayer.cards.map((c, idx) => {
-              if (c.revealed) return '';
-              const r = ROLES[c.role] || ROLES.duque;
+              if (c.eliminated) return '';
               return `
-                <button type="button" onclick="activeModalSignature=''; closeInteractionModal(); confirmInfluenceLoss('${localPlayer.id}', ${idx})" class="w-32 h-44 rounded-2xl overflow-hidden border-2 border-rose-500 hover:scale-105 transition relative shadow-xl">
-                  ${renderRoleCardFaceHTML(c.role)}
-                  <div class="absolute top-0 inset-x-0 bg-rose-900/90 py-1 text-center text-[10px] font-extrabold text-rose-100">
-                    Revelar ${r.name}
-                  </div>
+                <button type="button" onclick="onUserLoseCard(${idx})" class="hover:scale-105 transition">
+                  ${renderCardVisual(c.role, true, false)}
                 </button>
               `;
             }).join('')}
           </div>
         `;
-        openInteractionModal('Você Perdeu 1 Influência!', match.pendingLoss.reason, 'fa-heart-crack', bodyHTML, '');
+        document.getElementById('interaction-footer').innerHTML = '';
+        modal.classList.remove('hidden');
         return;
       }
 
-      // 2) Troca do Embaixador ou Inquisidor
-      if (match.phase === 'EXCHANGE' && match.pendingSpecial?.playerId === localPlayer.id) {
-        const sp = match.pendingSpecial;
-        const sig = `ex_${localPlayer.id}_${(sp.drawnCards || []).join('_')}`;
+      // 2. Troca do Embaixador ou Inquisidor
+      if (m.phase === 'exchange' && m.exchangeBuffer && m.exchangeBuffer.actorId === localPlayer.id) {
+        const sig = `ex_${m.version}_${localPlayer.id}`;
         if (activeModalSignature === sig) return;
         activeModalSignature = sig;
 
-        const aliveIndices = localPlayer.cards
-          .map((c, idx) => (!c.revealed ? idx : -1))
-          .filter(idx => idx !== -1);
-        const keepCount = aliveIndices.length;
+        const buf = m.exchangeBuffer;
+        window._selectedExchangeIndices = [];
 
-        const pool = [
-          ...aliveIndices.map(idx => ({ role: localPlayer.cards[idx].role, origin: 'hand' })),
-          ...(sp.drawnCards || []).map(role => ({ role, origin: 'deck' }))
-        ];
-
-        const selectedSet = new Set(Array.from({ length: keepCount }, (_, i) => i));
-
-        const renderPool = () => {
-          const bodyHTML = `
-            <p class="text-xs text-amber-300 font-bold mb-3 text-center">
-              Selecione exatamente ${keepCount} carta(s) para manter na sua mão (${selectedSet.size}/${keepCount}):
-            </p>
-            <div class="flex flex-wrap justify-center gap-3">
-              ${pool.map((item, idx) => {
-                const isSel = selectedSet.has(idx);
-                return `
-                  <button type="button" data-pool-idx="${idx}" class="ex-card-btn relative w-28 h-40 rounded-2xl overflow-hidden border-4 ${isSel ? 'border-emerald-400 scale-105' : 'border-slate-700 opacity-65'} transition">
-                    ${renderRoleCardFaceHTML(item.role)}
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          `;
-          const footerHTML = `
-            <button type="button" id="btn-confirm-exchange" class="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 text-xs font-extrabold">
-              Confirmar Cartas
-            </button>
-          `;
-          openInteractionModal(
-            sp.type === 'inquisidor' ? 'Troca do Inquisidor' : 'Troca do Embaixador',
-            'Escolha quais influências ficarão com você; as demais voltam ao baralho.',
-            'fa-arrows-rotate',
-            bodyHTML,
-            footerHTML
-          );
-
-          document.querySelectorAll('.ex-card-btn').forEach(b => {
-            b.onclick = () => {
-              const i = parseInt(b.dataset.poolIdx, 10);
-              if (selectedSet.has(i)) {
-                selectedSet.delete(i);
-              } else if (selectedSet.size < keepCount) {
-                selectedSet.add(i);
-              }
-              renderPool();
-            };
-          });
-
-          document.getElementById('btn-confirm-exchange').onclick = async () => {
-            if (selectedSet.size !== keepCount) {
-              showToast(`Selecione exatamente ${keepCount} carta(s)!`, 'error');
-              return;
-            }
-            const kept = [];
-            const returned = [];
-            pool.forEach((item, idx) => {
-              if (selectedSet.has(idx)) kept.push(item.role);
-              else returned.push(item.role);
-            });
-            aliveIndices.forEach((handIdx, k) => {
-              localPlayer.cards[handIdx].role = kept[k];
-            });
-            returned.forEach(r => match.deck.push(r));
-            for (let i = match.deck.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [match.deck[i], match.deck[j]] = [match.deck[j], match.deck[i]];
-            }
-            activeModalSignature = '';
-            closeInteractionModal();
-            advanceToNextTurn(match);
-            await syncMatchIfNeeded();
-          };
-        };
-
-        renderPool();
-        return;
-      }
-
-      // 3) Bufão: Olha carta do rival + carta do baralho e decide onde cada uma vai
-      if (match.phase === 'BUFAO_SWAP' && match.pendingSpecial?.playerId === localPlayer.id) {
-        const sp = match.pendingSpecial;
-        const sig = `bufao_${localPlayer.id}_${sp.targetId}_${sp.rivalCard}_${sp.deckCard}`;
-        if (activeModalSignature === sig) return;
-        activeModalSignature = sig;
-
-        const target = match.players.find(p => p.id === sp.targetId);
-        const rRival = ROLES[sp.rivalCard] || ROLES.duque;
-        const rDeck = ROLES[sp.deckCard] || ROLES.duque;
-
-        const bodyHTML = `
-          <div class="grid grid-cols-2 gap-4 text-center">
-            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-              <div class="text-[11px] font-bold text-amber-300 mb-2">Carta de ${target?.name}</div>
-              <div class="w-24 h-34 mx-auto rounded-xl overflow-hidden border border-slate-700">${renderRoleCardFaceHTML(sp.rivalCard)}</div>
-            </div>
-            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-              <div class="text-[11px] font-bold text-sky-300 mb-2">Carta do Baralho</div>
-              <div class="w-24 h-34 mx-auto rounded-xl overflow-hidden border border-slate-700">${renderRoleCardFaceHTML(sp.deckCard)}</div>
-            </div>
+        document.getElementById('interaction-icon').className = 'fa-solid fa-arrows-rotate text-emerald-400';
+        document.getElementById('interaction-title').textContent = `Escolha ${buf.keepCount} Carta(s) para Manter`;
+        document.getElementById('interaction-desc').textContent = 'As cartas não selecionadas voltarão para o baralho.';
+        document.getElementById('interaction-body').innerHTML = `
+          <div class="flex flex-wrap justify-center gap-3">
+            ${buf.pool.map((item, idx) => `
+              <button type="button" id="ex-card-btn-${idx}" onclick="toggleExchangeCard(${idx}, ${buf.keepCount})" class="p-1 rounded-2xl border-2 border-transparent transition">
+                ${renderCardVisual(item.role, true, false)}
+              </button>
+            `).join('')}
           </div>
         `;
-        const footerHTML = `
-          <button type="button" id="btn-bufao-keep" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white">
-            Devolver Igual
-          </button>
-          <button type="button" id="btn-bufao-swap" class="px-4 py-2.5 rounded-xl bg-pink-500 hover:bg-pink-400 text-slate-950 text-xs font-extrabold">
-            Trocar as Duas!
+        document.getElementById('interaction-footer').innerHTML = `
+          <button type="button" id="btn-confirm-exchange" disabled onclick="submitExchangeSelection()" class="px-5 py-2.5 rounded-xl bg-emerald-500 disabled:opacity-40 text-slate-950 text-xs font-extrabold">
+            Confirmar Cartas
           </button>
         `;
-        openInteractionModal('Truque do Bufão', `Decida qual carta fica na mão de ${target?.name} e qual volta ao baralho:`, 'fa-masks-theater', bodyHTML, footerHTML);
-
-        document.getElementById('btn-bufao-keep').onclick = async () => {
-          match.deck.push(sp.deckCard);
-          activeModalSignature = '';
-          closeInteractionModal();
-          advanceToNextTurn(match);
-          await syncMatchIfNeeded();
-        };
-
-        document.getElementById('btn-bufao-swap').onclick = async () => {
-          if (target && target.cards[sp.targetCardIdx]) {
-            target.cards[sp.targetCardIdx].role = sp.deckCard;
-          }
-          match.deck.push(sp.rivalCard);
-          activeModalSignature = '';
-          closeInteractionModal();
-          advanceToNextTurn(match);
-          await syncMatchIfNeeded();
-        };
+        modal.classList.remove('hidden');
         return;
       }
 
-      if (activeModalSignature !== '') {
-        activeModalSignature = '';
+      // 3. Inquisidor olhando carta de oponente
+      if (m.phase === 'inquisidor_peek' && m.exchangeBuffer && m.exchangeBuffer.actorId === localPlayer.id) {
+        const sig = `inq_${m.version}_${localPlayer.id}`;
+        if (activeModalSignature === sig) return;
+        activeModalSignature = sig;
+
+        const buf = m.exchangeBuffer;
+        const target = m.players.find(p => p.id === buf.targetId);
+        document.getElementById('interaction-icon').className = 'fa-solid fa-eye text-orange-400';
+        document.getElementById('interaction-title').textContent = `Carta de ${target ? target.name : 'Oponente'}`;
+        document.getElementById('interaction-desc').textContent = 'Deseja obrigar este jogador a trocar essa carta pelo baralho?';
+        document.getElementById('interaction-body').innerHTML = `
+          <div class="flex justify-center">
+            ${renderCardVisual(buf.inspectedRole, true, false)}
+          </div>
+        `;
+        document.getElementById('interaction-footer').innerHTML = `
+          <button type="button" onclick="onUserFinishInquisidor(false)" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-200">Deixar Manter</button>
+          <button type="button" onclick="onUserFinishInquisidor(true)" class="px-4 py-2 rounded-xl bg-orange-500 text-slate-950 text-xs font-extrabold">Forçar Troca</button>
+        `;
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      // 4. Bufão olhando carta do oponente + carta do baralho
+      if (m.phase === 'bufao_swap' && m.exchangeBuffer && m.exchangeBuffer.actorId === localPlayer.id) {
+        const sig = `buf_${m.version}_${localPlayer.id}`;
+        if (activeModalSignature === sig) return;
+        activeModalSignature = sig;
+
+        const buf = m.exchangeBuffer;
+        const target = m.players.find(p => p.id === buf.targetId);
+        document.getElementById('interaction-icon').className = 'fa-solid fa-masks-theater text-fuchsia-400';
+        document.getElementById('interaction-title').textContent = `Truque do Bufão com ${target ? target.name : 'Rival'}`;
+        document.getElementById('interaction-desc').textContent = 'Clique na carta que irá para a MÃO DO OPONENTE (a outra volta ao baralho):';
+        document.getElementById('interaction-body').innerHTML = `
+          <div class="flex justify-center gap-4">
+            ${buf.cards.map((roleId, idx) => `
+              <div class="flex flex-col items-center gap-2">
+                <span class="text-[10px] font-bold uppercase text-slate-400">${idx === 0 ? 'Era do Oponente' : 'Veio do Baralho'}</span>
+                <button type="button" onclick="onUserFinishBufao(${idx})" class="hover:scale-105 transition">
+                  ${renderCardVisual(roleId, true, false)}
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        document.getElementById('interaction-footer').innerHTML = '';
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      if (activeModalSignature && !activeModalSignature.startsWith('target_')) {
         closeInteractionModal();
       }
     }
 
+    // Handlers Globais dos Botões do Usuário
+    window.onUserSelectAction = function(actionId, needsTarget, allowAnyOpponent) {
+      const m = appState.match;
+      if (!m) return;
+      if (needsTarget) {
+        openTargetPicker(actionId, allowAnyOpponent);
+      } else {
+        declareAction(m, appState.localPlayerId, actionId);
+        syncOrRender();
+      }
+    };
+
+    window.onUserPass = function() {
+      const m = appState.match;
+      if (!m) return;
+      passReaction(m, appState.localPlayerId);
+      syncOrRender();
+    };
+
+    window.onUserContest = function() {
+      const m = appState.match;
+      if (!m) return;
+      declareContest(m, appState.localPlayerId);
+      syncOrRender();
+    };
+
+    window.onUserBlock = function(roleId) {
+      const m = appState.match;
+      if (!m) return;
+      declareBlock(m, appState.localPlayerId, roleId);
+      syncOrRender();
+    };
+
+    window.onUserClaimBurgues = function() {
+      const m = appState.match;
+      if (!m) return;
+      claimBurguesBonus(m, appState.localPlayerId);
+      syncOrRender();
+    };
+
+    window.onUserLoseCard = function(cardIdx) {
+      closeInteractionModal();
+      const m = appState.match;
+      if (!m) return;
+      confirmCardLoss(m, appState.localPlayerId, cardIdx);
+      syncOrRender();
+    };
+
+    window.toggleExchangeCard = function(idx, keepCount) {
+      const sel = window._selectedExchangeIndices || [];
+      const pos = sel.indexOf(idx);
+      if (pos !== -1) {
+        sel.splice(pos, 1);
+      } else if (sel.length < keepCount) {
+        sel.push(idx);
+      }
+      window._selectedExchangeIndices = sel;
+      document.querySelectorAll('[id^="ex-card-btn-"]').forEach((btn, i) => {
+        btn.classList.toggle('border-emerald-400', sel.includes(i));
+        btn.classList.toggle('bg-emerald-500/20', sel.includes(i));
+      });
+      const confirmBtn = document.getElementById('btn-confirm-exchange');
+      if (confirmBtn) confirmBtn.disabled = sel.length !== keepCount;
+    };
+
+    window.submitExchangeSelection = function() {
+      const sel = window._selectedExchangeIndices || [];
+      closeInteractionModal();
+      const m = appState.match;
+      if (!m) return;
+      finishExchangeSelection(m, sel);
+      syncOrRender();
+    };
+
+    window.onUserFinishInquisidor = function(forceSwap) {
+      closeInteractionModal();
+      const m = appState.match;
+      if (!m) return;
+      finishInquisidorPeek(m, forceSwap);
+      syncOrRender();
+    };
+
+    window.onUserFinishBufao = function(giveIdx) {
+      closeInteractionModal();
+      const m = appState.match;
+      if (!m) return;
+      finishBufaoSwap(m, giveIdx);
+      syncOrRender();
+    };
+
     // -------------------------------------------------------------------------
-    // 10. RELÓGIO MESTRE DE TURNO & REAÇÃO (4 SEGUNDOS)
-    // -------------------------------------------------------------------------
-    function startClockLoop() {
-      if (appState.clockTimer) clearInterval(appState.clockTimer);
-      appState.clockTimer = setInterval(async () => {
-        const match = appState.match;
-        if (!match || appState.mode !== 'game' || match.phase === 'GAME_OVER') return;
-
-        const now = Date.now();
-        const remaining = Math.max(0, Math.ceil((match.deadline - now) / 1000));
-        const valEl = document.getElementById('central-timer-value');
-        if (valEl) valEl.textContent = String(remaining);
-
-        // Atualiza contagem regressiva dentro do balão de pensamento
-        const activePlayer = match.players[match.turnIndex];
-        if (activePlayer?.bubble?.type === 'thought') {
-          renderGame();
-        }
-
-        // Timeout automático (apenas Host no multiplayer ou jogador local no Solo)
-        const canResolveTimeout = !appState.isMultiplayer || isLocalHost();
-        if (now >= match.deadline && canResolveTimeout) {
-          if (match.phase === 'REACTION_WINDOW') {
-            resolvePendingActionAfterReactions(match);
-            await syncMatchIfNeeded();
-          } else if (match.phase === 'ACTION_SELECT') {
-            const actor = match.players[match.turnIndex];
-            if (actor && actor.coins >= 10) {
-              const target = getAlivePlayers(match).find(p => p.id !== actor.id);
-              if (target) await declareAction('golpe', target.id);
-            } else {
-              await declareAction('renda');
-            }
-          } else if (match.phase === 'RESOLVING_LOSS' && match.pendingLoss) {
-            const victim = match.players.find(p => p.id === match.pendingLoss.victimId);
-            const idx = victim ? victim.cards.findIndex(c => !c.revealed) : -1;
-            if (victim && idx !== -1) {
-              await confirmInfluenceLoss(victim.id, idx);
-            }
-          }
-        }
-      }, 500);
-    }
-
-    // -------------------------------------------------------------------------
-    // 11. MULTIPLAYER ONLINE (SUPABASE SYNC)
+    // 10. MULTIPLAYER ONLINE (SINCRONIZAÇÃO COM SUPABASE)
     // -------------------------------------------------------------------------
     let roomDataCache = null;
+    let roomPollInterval = null;
 
     function isLocalHost() {
       return roomDataCache && roomDataCache.hostUid === appState.localPlayerId;
@@ -2000,7 +2092,8 @@
     }
 
     async function createOnlineRoom() {
-      const nick = document.getElementById('input-nickname').value.trim() || 'Nobre_' + Math.floor(100 + Math.random() * 899);
+      const nickInput = document.getElementById('input-nickname');
+      const nick = (nickInput.value || '').trim() || ('Nobre_' + Math.floor(100 + Math.random() * 899));
       appState.nickname = nick;
       localStorage.setItem('couplegas_nick', nick);
 
@@ -2040,24 +2133,24 @@
       } catch (err) {
         console.error(err);
         const msg = String(err.message || '');
-        if (msg.includes('401') || msg.includes('Invalid API key')) {
-          showToast('Chave API do Supabase inválida. Clique na engrenagem ao lado de Offline para atualizar.', 'error');
+        if (msg.includes('MISSING_SUPABASE_KEY') || msg.includes('401') || msg.includes('Invalid API key')) {
+          showToast('Chave API do Supabase inválida. Clique na engrenagem e cole sua chave anon.', 'error');
         } else if (msg.includes('404') || msg.includes('relation')) {
           showToast('Tabela couplegas_rooms não encontrada no Supabase.', 'error');
         } else {
-          showToast('Erro ao criar sala online. Verifique a engrenagem de conexão.', 'error');
+          showToast(`Erro ao criar sala: ${msg}`, 'error');
         }
       }
     }
 
     async function joinOnlineRoom() {
-      const nick = document.getElementById('input-nickname').value.trim() || 'Nobre_' + Math.floor(100 + Math.random() * 899);
-      const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+      const nickInput = document.getElementById('input-nickname');
+      const nick = (nickInput.value || '').trim() || ('Nobre_' + Math.floor(100 + Math.random() * 899));
+      const code = (document.getElementById('input-room-code').value || '').trim().toUpperCase();
       if (code.length !== 4) {
         showToast('Digite um código de sala válido com 4 letras.', 'error');
         return;
       }
-
       appState.nickname = nick;
       localStorage.setItem('couplegas_nick', nick);
 
@@ -2068,36 +2161,40 @@
           return;
         }
         const room = rows[0];
-        const players = Array.isArray(room.members) ? [...room.members] : [];
+        const members = Array.isArray(room.members) ? [...room.members] : [];
+        const existingIdx = members.findIndex(m => m.id === appState.localPlayerId);
 
-        if (room.status !== 'waiting' && !players.some(p => p.id === appState.localPlayerId)) {
+        if (room.status === 'playing' && existingIdx === -1) {
           showToast('Esta partida já está em andamento!', 'error');
           return;
         }
-        if (players.length >= 6 && !players.some(p => p.id === appState.localPlayerId)) {
+        if (existingIdx === -1 && members.length >= 6) {
           showToast('Esta sala já atingiu o limite de 6 jogadores.', 'error');
           return;
         }
 
-        if (!players.some(p => p.id === appState.localPlayerId)) {
-          players.push({ id: appState.localPlayerId, name: nick, isBot: false });
-          await sbRequest(`${SUPABASE_TABLE}?code=eq.${code}`, {
-            method: 'PATCH',
-            body: {
-              members: players,
-              stateVersion: Date.now()
-            }
-          });
+        if (existingIdx !== -1) {
+          members[existingIdx].name = nick;
+        } else {
+          members.push({ id: appState.localPlayerId, name: nick, isBot: false });
         }
 
-        roomDataCache = { ...room, members: players };
+        await sbRequest(`${SUPABASE_TABLE}?code=eq.${code}`, {
+          method: 'PATCH',
+          body: {
+            members,
+            stateVersion: Date.now()
+          }
+        });
+
+        room.members = members;
+        roomDataCache = room;
         appState.isMultiplayer = true;
         appState.roomCode = code;
         startPollingRoom();
 
-        const parsedMatch = room.gameStateJson ? JSON.parse(room.gameStateJson) : null;
-        if (parsedMatch && room.status === 'playing') {
-          appState.match = parsedMatch;
+        if (room.status === 'playing' && room.gameStateJson) {
+          appState.match = JSON.parse(room.gameStateJson);
           switchScreen('game');
           renderGame();
         } else {
@@ -2107,144 +2204,187 @@
         showToast(`Você entrou na sala ${code}!`, 'success');
       } catch (err) {
         console.error(err);
-        showToast('Falha ao entrar na sala online. Verifique a conexão.', 'error');
+        showToast(`Erro ao entrar na sala: ${err.message}`, 'error');
       }
     }
 
     function startPollingRoom() {
-      stopPollingRoom();
-      appState.pollTimer = setInterval(async () => {
+      if (roomPollInterval) clearInterval(roomPollInterval);
+      roomPollInterval = setInterval(async () => {
         if (!appState.isMultiplayer || !appState.roomCode) return;
         try {
           const rows = await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}&select=*`);
-          if (!rows || rows.length === 0) return;
-          const fresh = rows[0];
-          roomDataCache = fresh;
-
-          if (!appState.isSetupModalOpen && fresh.config) {
-            appState.config = { ...appState.config, ...fresh.config };
+          if (!rows || rows.length === 0) {
+            showToast('A sala foi encerrada pelo anfitrião.', 'info');
+            leaveOnlineRoom(false);
+            return;
+          }
+          const remote = rows[0];
+          roomDataCache = remote;
+          if (remote.config) {
+            appState.config = { ...appState.config, ...remote.config };
           }
 
-          const parsedMatch = fresh.gameStateJson ? JSON.parse(fresh.gameStateJson) : null;
-
-          if (fresh.status === 'waiting') {
-            if (appState.mode !== 'lobby') switchScreen('lobby');
+          if (remote.status === 'playing' && remote.gameStateJson) {
+            const parsed = JSON.parse(remote.gameStateJson);
+            if (!appState.match || parsed.version >= (appState.match.version || 0)) {
+              appState.match = parsed;
+              switchScreen('game');
+              renderGame();
+              scheduleBotLogicIfNeeded();
+            }
+          } else if (remote.status === 'waiting') {
+            switchScreen('lobby');
             renderLobby();
-          } else if (fresh.status === 'playing' && parsedMatch) {
-            appState.match = parsedMatch;
-            if (appState.mode !== 'game') switchScreen('game');
-            renderGame();
           }
         } catch (e) {
-          // Silent transient poll retry
+          // Ignora falha transitória de polling
         }
-      }, 1500);
+      }, 1400);
     }
 
-    function stopPollingRoom() {
-      if (appState.pollTimer) {
-        clearInterval(appState.pollTimer);
-        appState.pollTimer = null;
-      }
-    }
-
-    async function syncMatchIfNeeded() {
-      if (appState.mode === 'game') {
-        renderGame();
-        scheduleBotLogicIfNeeded();
-      }
-      if (!appState.isMultiplayer || !appState.roomCode || !roomDataCache) return;
+    async function pushMatchStateToSupabase() {
+      if (!appState.isMultiplayer || !appState.roomCode || !appState.match) return;
+      appState.match.version = (appState.match.version || 1) + 1;
       try {
         await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}`, {
           method: 'PATCH',
           body: {
-            status: appState.match ? 'playing' : 'waiting',
+            status: 'playing',
             config: appState.config,
             stateVersion: Date.now(),
-            gameStateJson: appState.match ? JSON.stringify(appState.match) : null
+            gameStateJson: JSON.stringify(appState.match)
           }
         });
       } catch (e) {
-        console.error('Sync failed:', e);
+        console.error('Erro ao sincronizar estado:', e);
       }
+    }
+
+    async function leaveOnlineRoom(notifyServer = true) {
+      if (roomPollInterval) clearInterval(roomPollInterval);
+      if (notifyServer && appState.isMultiplayer && appState.roomCode && roomDataCache) {
+        try {
+          if (isLocalHost()) {
+            await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}`, { method: 'DELETE' });
+          } else {
+            const remaining = (roomDataCache.members || []).filter(m => m.id !== appState.localPlayerId);
+            await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}`, {
+              method: 'PATCH',
+              body: { members: remaining, stateVersion: Date.now() }
+            });
+          }
+        } catch (e) {}
+      }
+      appState.isMultiplayer = false;
+      appState.roomCode = null;
+      appState.match = null;
+      roomDataCache = null;
+      switchScreen('home');
     }
 
     function renderLobby() {
       if (!roomDataCache) return;
-      const players = Array.isArray(roomDataCache.members) ? roomDataCache.members : [];
+      document.getElementById('lobby-room-code').textContent = roomDataCache.code;
+      const members = roomDataCache.members || [];
+      document.getElementById('lobby-player-count').textContent = `${members.length} / 6`;
+
       const cfg = roomDataCache.config || appState.config;
-      const host = isLocalHost();
-
-      document.getElementById('lobby-room-code').textContent = appState.roomCode;
       document.getElementById('lobby-rule-mode').textContent = cfg.gameMode === 'teams' ? 'Equipes & Asilo' : 'Todos Contra Todos';
-      document.getElementById('lobby-rule-time').textContent = `${cfg.turnDuration}s`;
-      document.getElementById('lobby-rule-deck').textContent = (cfg.enabledRoles || []).map(r => ROLES[r]?.name || r).join(', ');
+      document.getElementById('lobby-rule-time').textContent = `${cfg.turnTime || 30}s`;
+      const activeNames = (cfg.activeRoles || []).map(r => ROLES[r]?.name || r).join(', ');
+      document.getElementById('lobby-rule-deck').textContent = activeNames || 'Clássico';
 
+      const listEl = document.getElementById('lobby-players-list');
+      listEl.innerHTML = members.map(m => `
+        <div class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <i class="fa-solid ${m.id === roomDataCache.hostUid ? 'fa-crown text-amber-400' : 'fa-user text-sky-400'}"></i>
+            <span class="text-sm font-bold text-white">${m.name}</span>
+          </div>
+          <span class="text-[11px] font-bold uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+            ${m.id === roomDataCache.hostUid ? 'Anfitrião' : 'Convidado'}
+          </span>
+        </div>
+      `).join('');
+
+      const host = isLocalHost();
       document.getElementById('btn-lobby-edit-rules').classList.toggle('hidden', !host);
       document.getElementById('lobby-host-actions').classList.toggle('hidden', !host);
       document.getElementById('lobby-guest-wait').classList.toggle('hidden', host);
-
-      document.getElementById('lobby-player-count').textContent = `${players.length} / 6`;
-      const listEl = document.getElementById('lobby-players-list');
-      listEl.innerHTML = players.map(p => `
-        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900/90 border ${p.id === roomDataCache.hostUid ? 'border-amber-400/60' : 'border-slate-800'}">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center justify-center border border-amber-400/30">
-              ${p.name.slice(0, 2).toUpperCase()}
-            </div>
-            <span class="font-bold text-sm text-white">${p.name}</span>
-          </div>
-          ${p.id === roomDataCache.hostUid
-            ? '<span class="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">Host</span>'
-            : '<span class="text-[10px] uppercase font-semibold text-slate-400">Pronto</span>'}
-        </div>
-      `).join('');
     }
 
-    async function startMultiplayerMatch() {
-      if (!isLocalHost() || !roomDataCache) return;
-      const players = Array.isArray(roomDataCache.members) ? roomDataCache.members : [];
-      if (players.length < 2) {
-        showToast('São necessários pelo menos 2 jogadores na sala para iniciar!', 'error');
-        return;
+    function syncOrRender() {
+      renderGame();
+      scheduleBotLogicIfNeeded();
+      if (appState.isMultiplayer) {
+        pushMatchStateToSupabase();
       }
-      const match = createMatchState(players, appState.config);
-      appState.match = match;
-      switchScreen('game');
-      await syncMatchIfNeeded();
     }
 
     // -------------------------------------------------------------------------
-    // 12. CONFIGURAÇÃO DE REGRAS (MODAL) & GRIMÓRIO
+    // 11. RELÓGIO EM TEMPO REAL & SETUP / GRIMÓRIO
     // -------------------------------------------------------------------------
-    function openSetupModal(context = 'single') {
-      appState.setupContext = context;
-      appState.isSetupModalOpen = true;
+    function startClockLoop() {
+      setInterval(() => {
+        const m = appState.match;
+        if (!m || m.status !== 'playing' || m.phase === 'gameover') return;
 
-      document.getElementById('setup-bots-wrapper').classList.toggle('hidden', context !== 'single');
-      document.getElementById('btn-confirm-setup').textContent = context === 'single' ? 'Iniciar Partida Solo' : 'Salvar Regras da Sala';
+        const remaining = Math.max(0, Math.ceil((m.phaseDeadline - Date.now()) / 1000));
+        const timerEl = document.getElementById('central-timer-value');
+        if (timerEl) timerEl.textContent = remaining;
 
-      document.getElementById('setup-bot-range').value = String(appState.config.botCount || 3);
-      updateBotRangeLabel(appState.config.botCount || 3);
+        if (remaining <= 0) {
+          if (appState.isMultiplayer && !isLocalHost()) return;
 
-      document.querySelectorAll('input[name="cfg-gamemode"]').forEach(r => {
-        r.checked = r.value === (appState.config.gameMode || 'ffa');
-      });
-      document.querySelectorAll('input[name="cfg-turntime"]').forEach(r => {
-        r.checked = Number(r.value) === Number(appState.config.turnDuration || 30);
-      });
+          if (m.phase === 'reaction') {
+            resolveCurrentReactionWindow(m);
+            syncOrRender();
+          } else if (m.phase === 'action') {
+            const active = m.players[m.turnIndex];
+            if (active && isPlayerAlive(active)) {
+              if (active.coins >= 10) {
+                const target = getAlivePlayers(m).find(p => p.id !== active.id);
+                if (target) declareAction(m, active.id, 'coup', target.id);
+              } else {
+                declareAction(m, active.id, 'income');
+              }
+              syncOrRender();
+            }
+          } else if (m.phase === 'lose_card' && m.loserPrompt) {
+            const victim = m.players.find(p => p.id === m.loserPrompt.targetId);
+            const idx = victim ? victim.cards.findIndex(c => !c.eliminated) : -1;
+            if (idx !== -1) confirmCardLoss(m, victim.id, idx);
+            syncOrRender();
+          } else if (m.phase === 'exchange' && m.exchangeBuffer) {
+            const indices = Array.from({ length: m.exchangeBuffer.keepCount }, (_, i) => i);
+            finishExchangeSelection(m, indices);
+            syncOrRender();
+          } else if (m.phase === 'inquisidor_peek') {
+            finishInquisidorPeek(m, false);
+            syncOrRender();
+          } else if (m.phase === 'bufao_swap') {
+            finishBufaoSwap(m, 0);
+            syncOrRender();
+          }
+        }
+      }, 400);
+    }
+
+    function openSetupModal(mode) {
+      appState.setupMode = mode;
+      document.getElementById('setup-bots-wrapper').classList.toggle('hidden', mode !== 'solo');
 
       const rolesGrid = document.getElementById('setup-roles-grid');
-      rolesGrid.innerHTML = Object.values(ROLES).map(role => {
-        const checked = (appState.config.enabledRoles || []).includes(role.id);
+      rolesGrid.innerHTML = ALL_ROLE_IDS.map(rId => {
+        const r = ROLES[rId];
+        const checked = appState.config.activeRoles.includes(rId) ? 'checked' : '';
         return `
           <label class="cursor-pointer flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-400/50">
-            <input type="checkbox" value="${role.id}" ${checked ? 'checked' : ''} class="cfg-role-check accent-amber-400 w-4 h-4" />
+            <input type="checkbox" name="cfg-role" value="${rId}" ${checked} class="accent-amber-400 w-4 h-4" />
             <div class="min-w-0">
-              <div class="text-xs font-extrabold text-white flex items-center gap-1.5">
-                <i class="fa-solid ${role.icon}" style="color:${role.color}"></i> ${role.name}
-              </div>
-              <div class="text-[10px] text-slate-400 truncate">${role.actionLabel}</div>
+              <div class="text-xs font-extrabold text-white truncate">${r.name}</div>
+              <div class="text-[10px] text-slate-400 truncate">${r.actionName}</div>
             </div>
           </label>
         `;
@@ -2253,130 +2393,91 @@
       document.getElementById('modal-setup').classList.remove('hidden');
     }
 
-    function closeSetupModal() {
-      appState.isSetupModalOpen = false;
-      document.getElementById('modal-setup').classList.add('hidden');
-    }
-
-    function updateBotRangeLabel(val) {
-      const bots = Number(val);
-      document.getElementById('setup-bot-label').textContent = `${bots} Bot${bots > 1 ? 's' : ''} (${bots + 1} Jogadores)`;
-    }
-
-    function readSetupFormValues() {
-      const selectedRoles = Array.from(document.querySelectorAll('.cfg-role-check:checked')).map(cb => cb.value);
-      if (selectedRoles.length < 3) {
-        showToast('Selecione pelo menos 3 personagens diferentes para o baralho!', 'error');
-        return false;
-      }
-      appState.config.botCount = Number(document.getElementById('setup-bot-range').value || 3);
-      appState.config.gameMode = document.querySelector('input[name="cfg-gamemode"]:checked')?.value || 'ffa';
-      appState.config.turnDuration = Number(document.querySelector('input[name="cfg-turntime"]:checked')?.value || 30);
-      appState.config.enabledRoles = selectedRoles;
-      return true;
-    }
-
-    function startSinglePlayerMatch() {
-      appState.isMultiplayer = false;
-      appState.roomCode = null;
-      stopPollingRoom();
-
-      const botNames = ['Maquiavel', 'Borgia', 'Richelieu', 'Medici', 'Sforza'];
-      const players = [
-        { id: appState.localPlayerId, name: appState.nickname || 'Você', isBot: false }
-      ];
-      for (let i = 0; i < appState.config.botCount; i++) {
-        players.push({
-          id: `bot_${i + 1}`,
-          name: botNames[i] || `Bot ${i + 1}`,
-          isBot: true
-        });
-      }
-
-      appState.match = createMatchState(players, appState.config);
-      switchScreen('game');
-      renderGame();
-      scheduleBotLogicIfNeeded();
-    }
-
     function openGrimoireModal() {
       const grid = document.getElementById('grimoire-cards-grid');
-      grid.innerHTML = Object.values(ROLES).map(r => `
-        <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex gap-3">
-          <div class="w-20 h-28 rounded-xl overflow-hidden border border-slate-700 shrink-0">
-            ${renderRoleCardFaceHTML(r.id, true)}
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-extrabold text-white">${r.name}</span>
-              <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">${r.category}</span>
+      grid.innerHTML = ALL_ROLE_IDS.map(rId => {
+        const r = ROLES[rId];
+        return `
+          <div class="p-4 rounded-2xl bg-slate-950 border ${r.border} flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-extrabold text-white"><i class="fa-solid ${r.icon} ${r.color} mr-2"></i>${r.name}</span>
+                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${r.badgeBg}">${r.tag}</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed mb-3">${r.desc}</p>
             </div>
-            <p class="text-[11px] text-slate-300 mt-1"><strong>Ação:</strong> ${r.actionDesc}</p>
-            <p class="text-[11px] text-slate-400 mt-0.5"><strong>Defesa:</strong> ${r.blockDesc}</p>
+            <div class="pt-2 border-t border-slate-800 text-[11px] flex justify-between text-slate-400">
+              <span>Ação: <strong class="text-amber-300">${r.actionName}</strong></span>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
       document.getElementById('modal-grimoire').classList.remove('hidden');
     }
 
-    // -------------------------------------------------------------------------
-    // 13. INICIALIZAÇÃO DE EVENTOS DOM
-    // -------------------------------------------------------------------------
-    document.addEventListener('DOMContentLoaded', () => {
-      // Restaura nick salvo
-      const nickInput = document.getElementById('input-nickname');
-      if (nickInput && appState.nickname) nickInput.value = appState.nickname;
+    function openCloudConfigModal() {
+      document.getElementById('interaction-icon').className = 'fa-solid fa-cloud text-sky-400';
+      document.getElementById('interaction-title').textContent = 'Configurar Conexão Supabase';
+      document.getElementById('interaction-desc').textContent = 'Insira a Project URL e a Chave Pública (anon / sb_publishable) do seu projeto.';
+      document.getElementById('interaction-body').innerHTML = `
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Project URL</label>
+            <input id="cfg-sb-url" type="text" value="${SUPABASE_URL}" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">API Key (anon / publishable)</label>
+            <input id="cfg-sb-key" type="text" value="${SUPABASE_KEY}" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white" />
+          </div>
+        </div>
+      `;
+      document.getElementById('interaction-footer').innerHTML = `
+        <button type="button" onclick="closeInteractionModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300">Cancelar</button>
+        <button type="button" onclick="saveCloudConfig()" class="px-5 py-2 rounded-xl bg-sky-500 text-slate-950 text-xs font-extrabold">Salvar & Testar</button>
+      `;
+      document.getElementById('modal-interaction').classList.remove('hidden');
+    }
 
-      // Modo Solo & Grimório
-      document.getElementById('btn-open-single-setup').addEventListener('click', () => openSetupModal('single'));
+    window.saveCloudConfig = async function() {
+      const urlVal = (document.getElementById('cfg-sb-url').value || '').trim();
+      const keyVal = (document.getElementById('cfg-sb-key').value || '').trim();
+      SUPABASE_URL = urlVal || DEFAULT_SUPABASE_URL;
+      SUPABASE_KEY = keyVal || DEFAULT_SUPABASE_KEY;
+      localStorage.setItem('couplegas_sb_url', SUPABASE_URL);
+      localStorage.setItem('couplegas_sb_key', SUPABASE_KEY);
+      closeInteractionModal();
+      await checkSupabaseConnection();
+      showToast('Configuração de nuvem salva!', 'success');
+    };
+
+    // -------------------------------------------------------------------------
+    // 12. INICIALIZAÇÃO E EVENT LISTENERS
+    // -------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      const nickInput = document.getElementById('input-nickname');
+      if (nickInput && appState.nickname) {
+        nickInput.value = appState.nickname;
+      }
+
+      checkSupabaseConnection();
+      startClockLoop();
+
+      // Botões Tela Inicial
+      document.getElementById('btn-open-single-setup').addEventListener('click', () => openSetupModal('solo'));
       document.getElementById('btn-open-grimoire').addEventListener('click', openGrimoireModal);
       document.getElementById('btn-game-grimoire').addEventListener('click', openGrimoireModal);
       document.getElementById('btn-close-grimoire').addEventListener('click', () => {
         document.getElementById('modal-grimoire').classList.add('hidden');
       });
 
-      // Multiplayer Online
-      document.getElementById('btn-create-room').addEventListener('click', () => createOnlineRoom());
-      document.getElementById('btn-join-room').addEventListener('click', () => joinOnlineRoom());
+      document.getElementById('btn-cloud-config').addEventListener('click', openCloudConfigModal);
+      document.getElementById('btn-create-room').addEventListener('click', createOnlineRoom);
+      document.getElementById('btn-join-room').addEventListener('click', joinOnlineRoom);
 
-      document.getElementById('btn-cloud-config').addEventListener('click', () => {
-        const bodyHTML = `
-          <div class="space-y-3 text-left">
-            <div>
-              <label class="block text-xs font-bold text-amber-300 mb-1">Project URL (Supabase)</label>
-              <input id="cfg-sb-url" type="text" value="${SUPABASE_URL}" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono" />
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-amber-300 mb-1">Anon Public Key (eyJ...)</label>
-              <input id="cfg-sb-key" type="text" value="${SUPABASE_KEY}" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono" />
-            </div>
-          </div>
-        `;
-        const footerHTML = `
-          <button type="button" id="btn-sb-cancel" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300">Cancelar</button>
-          <button type="button" id="btn-sb-save" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-extrabold">Salvar & Testar</button>
-        `;
-        openInteractionModal('Servidor Supabase', 'Configure a URL e a chave pública anon do seu projeto:', 'fa-server', bodyHTML, footerHTML);
-        document.getElementById('btn-sb-cancel').onclick = closeInteractionModal;
-        document.getElementById('btn-sb-save').onclick = async () => {
-          const newUrl = document.getElementById('cfg-sb-url').value.trim();
-          const newKey = document.getElementById('cfg-sb-key').value.trim();
-          if (newUrl && newKey) {
-            SUPABASE_URL = newUrl;
-            SUPABASE_KEY = newKey;
-            localStorage.setItem('couplegas_sb_url', newUrl);
-            localStorage.setItem('couplegas_sb_key', newKey);
-          }
-          closeInteractionModal();
-          await checkSupabaseConnection();
-          showToast('Configurações de nuvem atualizadas!', 'info');
-        };
-      });
-
-      // Controles do Lobby Online
+      // Botões Lobby
       document.getElementById('btn-copy-code').addEventListener('click', () => {
         if (!appState.roomCode) return;
-        const temp = document.createElement('input');
+        const temp = document.createElement('textarea');
         temp.value = appState.roomCode;
         document.body.appendChild(temp);
         temp.select();
@@ -2385,89 +2486,103 @@
         showToast(`Código ${appState.roomCode} copiado!`, 'success');
       });
 
-      document.getElementById('btn-lobby-edit-rules').addEventListener('click', () => {
-        if (isLocalHost()) openSetupModal('multiplayer_edit');
+      document.getElementById('btn-leave-lobby').addEventListener('click', () => leaveOnlineRoom(true));
+      document.getElementById('btn-lobby-edit-rules').addEventListener('click', () => openSetupModal('lobby'));
+
+      document.getElementById('btn-start-multiplayer').addEventListener('click', async () => {
+        if (!roomDataCache || !isLocalHost()) return;
+        const members = [...(roomDataCache.members || [])];
+        if (members.length < 2) {
+          members.push({ id: 'bot_1', name: 'Barão Bot', isBot: true });
+        }
+        appState.match = createInitialMatchState(members, appState.config);
+        switchScreen('game');
+        syncOrRender();
       });
 
-      document.getElementById('btn-start-multiplayer').addEventListener('click', () => startMultiplayerMatch());
-
-      document.getElementById('btn-leave-lobby').addEventListener('click', () => {
-        stopPollingRoom();
-        appState.isMultiplayer = false;
-        appState.roomCode = null;
-        roomDataCache = null;
-        switchScreen('home');
+      // Botões Modal Setup
+      const botRange = document.getElementById('setup-bot-range');
+      botRange.addEventListener('input', () => {
+        const count = parseInt(botRange.value, 10);
+        document.getElementById('setup-bot-label').textContent = `${count} Bot${count > 1 ? 's' : ''} (${count + 1} Jogadores)`;
       });
 
-      // Controles do Modal de Configuração
-      document.getElementById('setup-bot-range').addEventListener('input', (e) => updateBotRangeLabel(e.target.value));
-      document.getElementById('btn-close-setup').addEventListener('click', closeSetupModal);
-      document.getElementById('btn-cancel-setup').addEventListener('click', closeSetupModal);
+      document.getElementById('btn-close-setup').addEventListener('click', () => {
+        document.getElementById('modal-setup').classList.add('hidden');
+      });
+      document.getElementById('btn-cancel-setup').addEventListener('click', () => {
+        document.getElementById('modal-setup').classList.add('hidden');
+      });
 
       document.getElementById('btn-confirm-setup').addEventListener('click', async () => {
-        if (!readSetupFormValues()) return;
-        const ctx = appState.setupContext;
-        closeSetupModal();
-
-        if (ctx === 'single') {
-          startSinglePlayerMatch();
-        } else if (ctx === 'multiplayer_edit' && appState.roomCode && roomDataCache) {
-          roomDataCache.config = { ...appState.config };
-          renderLobby();
-          try {
-            await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}`, {
-              method: 'PATCH',
-              body: {
-                config: { ...appState.config },
-                stateVersion: Date.now()
-              }
-            });
-            showToast('Regras da sala atualizadas!', 'success');
-          } catch (e) {
-            showToast('Erro ao salvar regras.', 'error');
-          }
-        }
-      });
-
-      // Botão Segurar p/ Ver Cartas (Sem trocar cartas)
-      const btnPeek = document.getElementById('btn-peek-cards');
-      if (btnPeek) {
-        btnPeek.addEventListener('pointerdown', (e) => {
-          e.preventDefault();
-          setPeekingState(true);
-        });
-        ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => {
-          btnPeek.addEventListener(evt, () => setPeekingState(false));
-        });
-      }
-
-      // Reiniciar (Apenas Host) e Sair da Partida
-      document.getElementById('btn-host-restart').addEventListener('click', async () => {
-        if (!appState.match) return;
-        if (!appState.isMultiplayer) {
-          startSinglePlayerMatch();
+        const selectedRoles = Array.from(document.querySelectorAll('input[name="cfg-role"]:checked')).map(el => el.value);
+        if (selectedRoles.length < 3) {
+          showToast('Selecione pelo menos 3 personagens para formar o baralho.', 'error');
           return;
         }
-        if (!isLocalHost() || !roomDataCache) return;
-        const players = Array.isArray(roomDataCache.members) ? roomDataCache.members : [];
-        appState.match = createMatchState(players, appState.config);
-        await syncMatchIfNeeded();
-        showToast('Partida reiniciada pelo anfitrião!', 'info');
+        const gameMode = document.querySelector('input[name="cfg-gamemode"]:checked')?.value || 'ffa';
+        const turnTime = parseInt(document.querySelector('input[name="cfg-turntime"]:checked')?.value || '30', 10);
+        const botCount = parseInt(botRange.value, 10) || 3;
+
+        appState.config = { botCount, gameMode, turnTime, activeRoles: selectedRoles };
+        document.getElementById('modal-setup').classList.add('hidden');
+
+        if (appState.setupMode === 'lobby' && appState.isMultiplayer && isLocalHost()) {
+          roomDataCache.config = { ...appState.config };
+          renderLobby();
+          await sbRequest(`${SUPABASE_TABLE}?code=eq.${appState.roomCode}`, {
+            method: 'PATCH',
+            body: { config: appState.config, stateVersion: Date.now() }
+          });
+          showToast('Regras da sala atualizadas!', 'success');
+          return;
+        }
+
+        // Iniciar Modo Solo
+        appState.isMultiplayer = false;
+        const botNames = ['Duquesa Vance', 'Lorde Varys', 'Capitão Flint', 'Lady Olenna', 'Inquisidor Torq'];
+        const players = [{ id: appState.localPlayerId, name: appState.nickname || 'Você', isBot: false }];
+        for (let i = 0; i < botCount; i++) {
+          players.push({ id: `bot_${i + 1}`, name: botNames[i % botNames.length], isBot: true });
+        }
+        appState.match = createInitialMatchState(players, appState.config);
+        switchScreen('game');
+        renderGame();
+        scheduleBotLogicIfNeeded();
+      });
+
+      // Segurar para Ver Cartas (Mouse + Touch)
+      const peekBtn = document.getElementById('btn-peek-cards');
+      const setPeeking = (state) => {
+        appState.peeking = state;
+        document.getElementById('peek-icon').className = state ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+        document.getElementById('peek-label').textContent = state ? 'Mostrando Cartas...' : 'Segurar p/ Ver Cartas';
+        renderGame();
+      };
+      peekBtn.addEventListener('mousedown', () => setPeeking(true));
+      peekBtn.addEventListener('mouseup', () => setPeeking(false));
+      peekBtn.addEventListener('mouseleave', () => setPeeking(false));
+      peekBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setPeeking(true); });
+      peekBtn.addEventListener('touchend', () => setPeeking(false));
+
+      // Reiniciar / Sair da Partida
+      document.getElementById('btn-host-restart').addEventListener('click', () => {
+        if (!appState.match) return;
+        const players = appState.match.players.map(p => ({ id: p.id, name: p.name, isBot: p.isBot }));
+        appState.match = createInitialMatchState(players, appState.config);
+        syncOrRender();
+        showToast('Partida reiniciada!', 'success');
       });
 
       document.getElementById('btn-exit-game').addEventListener('click', () => {
-        if (botActionTimeout) clearTimeout(botActionTimeout);
-        stopPollingRoom();
-        appState.match = null;
-        appState.isMultiplayer = false;
-        appState.roomCode = null;
-        roomDataCache = null;
-        switchScreen('home');
+        if (botDecisionTimer) clearTimeout(botDecisionTimer);
+        if (appState.isMultiplayer) {
+          leaveOnlineRoom(true);
+        } else {
+          appState.match = null;
+          switchScreen('home');
+        }
       });
-
-      // Inicia Relógio Mestre e Testa Conexão com Supabase
-      startClockLoop();
-      checkSupabaseConnection();
     });
   </script>
 </body>
